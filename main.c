@@ -151,11 +151,11 @@ void applyCommands(){
 int main(int argc, char ** argv){
     if(argc != 5) exit(EXIT_FAILURE);
     
-    time_t start = time(NULL);
+    clock_t start = clock();
    
     init_fs();
+    
     FILE *inputfile, *outputfile;
-
     inputfile = fopen(argv[1],"r");
     outputfile = fopen(argv[2],"w");
 
@@ -169,9 +169,10 @@ int main(int argc, char ** argv){
     fclose(outputfile);
     destroy_fs();
     
-    time_t end = time(NULL);
+    clock_t end = clock();
 
-    printf("TecnicoFS completed in %.4f seconds.\n",difftime(end,start));
+    double delta = ((double)end-start)/CLOCKS_PER_SEC;
+    printf("TecnicoFS completed in %.4f seconds.\n",delta);
 
     exit(EXIT_SUCCESS);
 }
