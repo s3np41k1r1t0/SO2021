@@ -29,4 +29,4 @@ clean:
 	rm -f fs/*.o *.o *.out *.last tecnicofs
 
 run: tecnicofs
-	./tecnicofs inputs/test1.txt lol.out 3 mutex
+	./tecnicofs inputs/test1.txt lol.out 1 nosync

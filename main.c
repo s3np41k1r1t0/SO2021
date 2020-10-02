@@ -4,7 +4,6 @@
 #include <getopt.h>
 #include <string.h>
 #include <ctype.h>
-#include <unistd.h>
 #include "fs/operations.h"
 
 #define MAX_COMMANDS 150000
@@ -159,14 +158,50 @@ int main(int argc, char ** argv){
     inputfile = fopen(argv[1],"r");
     outputfile = fopen(argv[2],"w");
 
-    if(inputfile == NULL || outputfile == NULL) exit(EXIT_FAILURE);
+    if(inputfile == NULL || outputfile == NULL){ 
+        perror("Something went wrong while opening the files, please check if input file exists");
+        exit(EXIT_FAILURE);
+    }
+     
+    numberThreads = atoi(argv[3]);
+    
+    if(numberThreads < 1){
+        perror("Invalid number of threads (must be greater than 0)");
+        exit(EXIT_FAILURE);
+    }
 
     processInput(inputfile);
-    applyCommands();
-    print_tecnicofs_tree(outputfile);
-
     fclose(inputfile);
+
+    if(!strcmp(argv[4],"nosync")){
+        if(numberThreads != 1){
+            perror("Invalid number of threads for nosync option (must be 1)");
+            exit(EXIT_FAILURE);
+        }
+
+        applyCommands();
+    }
+    
+    //TBI
+    else if(!strcmp(argv[4],"mutex")){
+        perror("Not implemented yet");
+        exit(EXIT_FAILURE);
+    }
+    
+    //TBI
+    else if(!strcmp(argv[4],"rwlock")){
+        perror("Not implemented yet");
+        exit(EXIT_FAILURE);
+    }
+
+    else{
+        perror("Invalid synchstrategy!");
+        exit(EXIT_FAILURE);
+    }
+
+    print_tecnicofs_tree(outputfile);
     fclose(outputfile);
+    
     destroy_fs();
     
     clock_t end = clock();
