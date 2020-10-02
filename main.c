@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
 #include "fs/operations.h"
 
 #define MAX_COMMANDS 150000
@@ -35,11 +37,11 @@ void errorParse(){
     exit(EXIT_FAILURE);
 }
 
-void processInput(){
+void processInput(FILE *input){
     char line[MAX_INPUT_SIZE];
 
     /* break loop with ^Z or ^D */
-    while (fgets(line, sizeof(line)/sizeof(char), stdin)) {
+    while (fgets(line, sizeof(line)/sizeof(char), input)) {
         char token, type;
         char name[MAX_INPUT_SIZE];
 
@@ -132,17 +134,44 @@ void applyCommands(){
     }
 }
 
-int main(int argc, char* argv[]) {
-    /* init filesystem */
+//int main(int argc, char* argv[]) {
+//    /* init filesystem */
+//    init_fs();
+//
+//    /* process input and print tree */
+//    processInput();
+//    applyCommands();
+//    print_tecnicofs_tree(stdout);
+//
+//    /* release allocated memory */
+//    destroy_fs();
+//    exit(EXIT_SUCCESS);
+//}
+
+int main(int argc, char ** argv){
+    if(argc != 5) exit(EXIT_FAILURE);
+    
+    time_t start = time(NULL);
+   
     init_fs();
+    FILE *inputfile, *outputfile;
 
-    /* process input and print tree */
-    processInput();
+    inputfile = fopen(argv[1],"r");
+    outputfile = fopen(argv[2],"w");
+
+    if(inputfile == NULL || outputfile == NULL) exit(EXIT_FAILURE);
+
+    processInput(inputfile);
     applyCommands();
-    print_tecnicofs_tree(stdout);
+    print_tecnicofs_tree(outputfile);
 
-    /* release allocated memory */
+    fclose(inputfile);
+    fclose(outputfile);
     destroy_fs();
+    
+    time_t end = time(NULL);
+
+    printf("TecnicoFS completed in %.4f seconds.\n",difftime(end,start));
+
     exit(EXIT_SUCCESS);
 }
-
