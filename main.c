@@ -133,6 +133,57 @@ void applyCommands(){
     }
 }
 
+void applyMutex(){
+    while (numberCommands > 0){
+        const char* command = removeCommand();
+        if (command == NULL){
+            continue;
+        }
+
+        char token, type;
+        char name[MAX_INPUT_SIZE];
+        int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
+        if (numTokens < 2) {
+            fprintf(stderr, "Error: invalid command in Queue\n");
+            exit(EXIT_FAILURE);
+        }
+
+        int searchResult;
+        switch (token) {
+            case 'c':
+                switch (type) {
+                    case 'f':
+                        printf("Create file: %s\n", name);
+                        create(name, T_FILE);
+                        break;
+                    case 'd':
+                        printf("Create directory: %s\n", name);
+                        create(name, T_DIRECTORY);
+                        break;
+                    default:
+                        fprintf(stderr, "Error: invalid node type\n");
+                        exit(EXIT_FAILURE);
+                }
+                break;
+            case 'l': 
+                searchResult = lookup(name);
+                if (searchResult >= 0)
+                    printf("Search: %s found\n", name);
+                else
+                    printf("Search: %s not found\n", name);
+                break;
+            case 'd':
+                printf("Delete: %s\n", name);
+                delete(name);
+                break;
+            default: { /* error */
+                fprintf(stderr, "Error: command to apply\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+}
+
 //int main(int argc, char* argv[]) {
 //    /* init filesystem */
 //    init_fs();
@@ -158,10 +209,9 @@ int main(int argc, char ** argv){
     
     FILE *inputfile, *outputfile;
     inputfile = fopen(argv[1],"r");
-    outputfile = fopen(argv[2],"w");
 
-    //validates if user has permissions to open input and output files and if input exists
-    if(inputfile == NULL || outputfile == NULL){ 
+    //validates if user has permissions to open input file and if it exists
+    if(inputfile == NULL){ 
         perror("Something went wrong while opening the files, please check if input file exists");
         exit(EXIT_FAILURE);
     }
@@ -182,7 +232,7 @@ int main(int argc, char ** argv){
     //implement strcmp with macros
     if(!strcmp(argv[4],"nosync")){
         if(numberThreads != 1){
-            perror("Invalid number of threads for nosync option (must be 1)");
+            fprintf(stderr,"Invalid number of threads for nosync option (must be 1)\n");
             exit(EXIT_FAILURE);
         }
 
@@ -191,22 +241,29 @@ int main(int argc, char ** argv){
     
     //TBI
     else if(!strcmp(argv[4],"mutex")){
-        perror("Not implemented yet");
+        fprintf(stderr,"Not implemented yet\n");
         exit(EXIT_FAILURE);
     }
     
     //TBI
     else if(!strcmp(argv[4],"rwlock")){
-        perror("Not implemented yet");
+        fprintf(stderr,"Not implemented yet\n");
         exit(EXIT_FAILURE);
     }
 
     else{
-        perror("Invalid synchstrategy!");
+        fprintf(stderr,"Invalid synchstrategy!\n");
         exit(EXIT_FAILURE);
     }
 
     //writes output to output file
+    outputfile = fopen(argv[2],"w");
+    
+    if(outputfile == NULL){
+        fprintf(stderr,"Cannot open/create output file\n");
+        exit(EXIT_SUCCESS);        
+    } 
+
     print_tecnicofs_tree(outputfile);
     fclose(outputfile);
     
