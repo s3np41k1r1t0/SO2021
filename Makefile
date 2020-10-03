@@ -3,7 +3,7 @@
 SHELL := /bin/bash
 CC   = gcc
 LD   = gcc
-CFLAGS =-Wall -std=gnu99 -I../
+CFLAGS =-Wall -std=gnu99 -I../ -pthread
 LDFLAGS=-lm
 
 build: tecnicofs
@@ -25,7 +25,7 @@ clean:
 	rm -f fs/*.o *.o *.out *.last tecnicofs
 
 %.txt: outputs/%.stdin
-	./tecnicofs inputs/$@ output.out 1 nosync > stdin.last
+	./tecnicofs inputs/$@ output.out 4 mutex > stdin.last
 	diff <(head -n -1 stdin.last) <(head -n -1 $<)
 	diff <(sort output.out) <(sort outputs/$@)
 
