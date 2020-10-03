@@ -1,16 +1,12 @@
 # Makefile, versao 1
 # Sistemas Operativos, DEI/IST/ULisboa 2020-21
-
+SHELL := /bin/bash
 CC   = gcc
 LD   = gcc
 CFLAGS =-Wall -std=gnu99 -I../
 LDFLAGS=-lm
 
-# A phony target is one that is not really the name of a file
-# https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
-.PHONY: all clean run
-
-all: tecnicofs
+build: tecnicofs
 
 tecnicofs: fs/state.o fs/operations.o main.o
 	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs fs/state.o fs/operations.o main.o
@@ -28,5 +24,9 @@ clean:
 	@echo Cleaning...
 	rm -f fs/*.o *.o *.out *.last tecnicofs
 
-run: tecnicofs
-	./tecnicofs inputs/test1.txt lol.out 1 nosync
+%.txt: outputs/%.stdin
+	./tecnicofs inputs/$@ output.out 1 nosync > stdin.last
+	diff <(head -n -1 stdin.last) <(head -n -1 $<)
+	diff <(sort output.out) <(sort outputs/$@)
+
+test: test1.txt test2.txt test3.txt test4.txt

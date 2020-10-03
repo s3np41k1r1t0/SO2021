@@ -5,6 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "fs/operations.h"
+#include <pthread.h>
 
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
