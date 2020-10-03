@@ -25,7 +25,10 @@ clean:
 	rm -f fs/*.o *.o *.out *.last tecnicofs
 
 %.txt: outputs/%.stdin
-	./tecnicofs inputs/$@ output.out 4 mutex > stdin.last
+	./tecnicofs inputs/$@ output.out 1 nosync > stdin.last
+	diff <(head -n -1 stdin.last) <(head -n -1 $<)
+	diff <(sort output.out) <(sort outputs/$@)
+	./tecnicofs inputs/$@ output.out 3 mutex > stdin.last
 	diff <(head -n -1 stdin.last) <(head -n -1 $<)
 	diff <(sort output.out) <(sort outputs/$@)
 
