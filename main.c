@@ -147,9 +147,11 @@ void applyCommands(){
 //    exit(EXIT_SUCCESS);
 //}
 
+//Usage: ./tecnicofs <inputfile> <outputfile> numthreads synchstrategy
 int main(int argc, char ** argv){
     if(argc != 5) exit(EXIT_FAILURE);
     
+    //starts measuring time in clock cicles to archive better accuracy than time(NULL)
     clock_t start = clock();
    
     init_fs();
@@ -158,6 +160,7 @@ int main(int argc, char ** argv){
     inputfile = fopen(argv[1],"r");
     outputfile = fopen(argv[2],"w");
 
+    //validates if user has permissions to open input and output files and if input exists
     if(inputfile == NULL || outputfile == NULL){ 
         perror("Something went wrong while opening the files, please check if input file exists");
         exit(EXIT_FAILURE);
@@ -165,14 +168,18 @@ int main(int argc, char ** argv){
      
     numberThreads = atoi(argv[3]);
     
+    //validates numthreads parameter
     if(numberThreads < 1){
         perror("Invalid number of threads (must be greater than 0)");
         exit(EXIT_FAILURE);
     }
 
+    //reads all the commands from the input file
     processInput(inputfile);
     fclose(inputfile);
 
+    //validates the synchstrategy parameter and applies all commands previously read
+    //implement strcmp with macros
     if(!strcmp(argv[4],"nosync")){
         if(numberThreads != 1){
             perror("Invalid number of threads for nosync option (must be 1)");
@@ -199,13 +206,15 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
+    //writes output to output file
     print_tecnicofs_tree(outputfile);
     fclose(outputfile);
     
     destroy_fs();
     
     clock_t end = clock();
-
+    
+    //calculates time diff and displays benchmark
     double delta = ((double)end-start)/CLOCKS_PER_SEC;
     printf("TecnicoFS completed in %.4f seconds.\n",delta);
 
