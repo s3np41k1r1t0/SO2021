@@ -10,6 +10,10 @@
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
 
+#define NOSYNC "nosync"
+#define MUTEX "mutex"
+#define RWLOCK "rwlock"
+
 int numberThreads = 0;
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
@@ -85,57 +89,6 @@ void processInput(FILE *input){
     }
 }
 
-//void applyCommands(){
-//    while (numberCommands > 0){
-//        const char* command = removeCommand();
-//        if (command == NULL){
-//            continue;
-//        }
-//
-//        char token, type;
-//        char name[MAX_INPUT_SIZE];
-//        int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
-//        if (numTokens < 2) {
-//            fprintf(stderr, "Error: invalid command in Queue\n");
-//            exit(EXIT_FAILURE);
-//        }
-//
-//        int searchResult;
-//        switch (token) {
-//            case 'c':
-//                switch (type) {
-//                    case 'f':
-//                        printf("Create file: %s\n", name);
-//                        create(name, T_FILE);
-//                        break;
-//                    case 'd':
-//                        printf("Create directory: %s\n", name);
-//                        create(name, T_DIRECTORY);
-//                        break;
-//                    default:
-//                        fprintf(stderr, "Error: invalid node type\n");
-//                        exit(EXIT_FAILURE);
-//                }
-//                break;
-//            case 'l': 
-//                searchResult = lookup(name);
-//                if (searchResult >= 0)
-//                    printf("Search: %s found\n", name);
-//                else
-//                    printf("Search: %s not found\n", name);
-//                break;
-//            case 'd':
-//                printf("Delete: %s\n", name);
-//                delete(name);
-//                break;
-//            default: { /* error */
-//                fprintf(stderr, "Error: command to apply\n");
-//                exit(EXIT_FAILURE);
-//            }
-//        }
-//    }
-//}
-
 void applyCommand(){
     pthread_mutex_lock(&mutex_comandos);
     const char* command = removeCommand();
@@ -208,22 +161,30 @@ int main(int argc, char ** argv){
     //starts measuring time in clock cicles to archive better accuracy than time(NULL)
     clock_t start = clock();
    
-    init_fs();
+    //validates the synchstrategy parameter and applies all commands previously read
+    //implement strcmp with macros
+    if(!strcmp(argv[4],NOSYNC) || !strcmp(argv[4],MUTEX) || !strcmp(argv[4],RWLOCK))
+        init_fs(argv[4]);
     
+    else{
+        fprintf(stderr,"Invalid sync strategy\n");
+        exit(EXIT_FAILURE);
+    }
+
     FILE *inputfile, *outputfile;
     inputfile = fopen(argv[1],"r");
 
     //validates if user has permissions to open input file and if it exists
     if(inputfile == NULL){ 
-        perror("Something went wrong while opening the files, please check if input file exists");
+        fprintf(stderr,"Something went wrong while opening the files, please check if input file exists\n");
         exit(EXIT_FAILURE);
     }
      
     numberThreads = atoi(argv[3]);
     
     //validates numthreads parameter
-    if(numberThreads < 1){
-        perror("Invalid number of threads (must be greater than 0)");
+    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(argv[4],"nosync"))){
+        fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
         exit(EXIT_FAILURE);
     }
 
@@ -231,32 +192,7 @@ int main(int argc, char ** argv){
     processInput(inputfile);
     fclose(inputfile);
 
-    //validates the synchstrategy parameter and applies all commands previously read
-    //implement strcmp with macros
-    if(!strcmp(argv[4],"nosync")){
-        if(numberThreads != 1){
-            fprintf(stderr,"Invalid number of threads for nosync option (must be 1)\n");
-            exit(EXIT_FAILURE);
-        }
-
-        applyCommands();
-    }
-    
-    //TBI
-    else if(!strcmp(argv[4],"mutex")){
-        applyCommands();
-    }
-    
-    //TBI
-    else if(!strcmp(argv[4],"rwlock")){
-        fprintf(stderr,"Not implemented yet\n");
-        exit(EXIT_FAILURE);
-    }
-
-    else{
-        fprintf(stderr,"Invalid synchstrategy!\n");
-        exit(EXIT_FAILURE);
-    }
+    applyCommands();
 
     //writes output to output file
     outputfile = fopen(argv[2],"w");

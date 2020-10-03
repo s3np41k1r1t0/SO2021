@@ -43,8 +43,8 @@ void split_parent_child_from_path(char * path, char ** parent, char ** child) {
 /*
  * Initializes tecnicofs and creates root node.
  */
-void init_fs() {
-	inode_table_init();
+void init_fs(char *mode) {
+	inode_table_init(mode);
 	
 	/* create root inode */
 	int root = inode_create(T_DIRECTORY);
