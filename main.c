@@ -213,22 +213,50 @@ void applyCommands(){
     }
 }
 
+
+char check_strategy(char *strategy){
+    if(!strcmp(strategy,NOSYNC) || !strcmp(strategy,MUTEX) || !strcmp(strategy,RWLOCK))
+        return strategy[0];    
+    
+    else{
+        fprintf(stderr,"Invalid sync strategy\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void check_inputfile(FILE *inputfile){
+    if(inputfile == NULL){ 
+        fprintf(stderr,"Something went wrong while opening the files, please check if input file exists\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void check_numberThreads(int numberThreads, char *strategy){
+    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy,"nosync"))){
+        fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void check_outputfile(FILE *outputfile){
+    if(outputfile == NULL){
+        fprintf(stderr,"Cannot open/create output file\n");
+        exit(EXIT_SUCCESS);        
+    }
+}
+
 //Usage: ./tecnicofs <inputfile> <outputfile> numthreads synchstrategy
 int main(int argc, char ** argv){
     if(argc != 5) exit(EXIT_FAILURE);
+
+    char *strategy = argv[4];
     
     //starts measuring time in clock cicles to archive better accuracy than time(NULL)
     clock_t start = clock();
    
     //validates the synchstrategy parameter and applies all commands previously read
     //implement strcmp with macros
-    if(!strcmp(argv[4],NOSYNC) || !strcmp(argv[4],MUTEX) || !strcmp(argv[4],RWLOCK))
-        mode = argv[4][0];    
-    
-    else{
-        fprintf(stderr,"Invalid sync strategy\n");
-        exit(EXIT_FAILURE);
-    }
+    mode = check_strategy(strategy);
     
     init_fs();
 
@@ -236,18 +264,12 @@ int main(int argc, char ** argv){
     inputfile = fopen(argv[1],"r");
 
     //validates if user has permissions to open input file and if it exists
-    if(inputfile == NULL){ 
-        fprintf(stderr,"Something went wrong while opening the files, please check if input file exists\n");
-        exit(EXIT_FAILURE);
-    }
+    check_inputfile(inputfile);
      
     numberThreads = atoi(argv[3]);
     
     //validates numthreads parameter
-    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(argv[4],"nosync"))){
-        fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
-        exit(EXIT_FAILURE);
-    }
+    check_numberThreads(numberThreads, strategy);
 
     //reads all the commands from the input file
     processInput(inputfile);
@@ -258,10 +280,7 @@ int main(int argc, char ** argv){
     //writes output to output file
     outputfile = fopen(argv[2],"w");
     
-    if(outputfile == NULL){
-        fprintf(stderr,"Cannot open/create output file\n");
-        exit(EXIT_SUCCESS);        
-    } 
+    check_outputfile(outputfile); 
 
     print_tecnicofs_tree(outputfile);
     fclose(outputfile);
