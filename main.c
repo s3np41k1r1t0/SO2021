@@ -232,7 +232,7 @@ void check_inputfile(FILE *inputfile){
 }
 
 void check_numberThreads(int numberThreads, char *strategy){
-    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy,"nosync"))){
+    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy, NOSYNC))){
         fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
         exit(EXIT_FAILURE);
     }
