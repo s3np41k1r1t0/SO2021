@@ -36,3 +36,4 @@ clean:
 	diff <(sort output.out) <(sort outputs/$@)
 
 test: test1.txt test2.txt test3.txt test4.txt
+test3: test3.txt

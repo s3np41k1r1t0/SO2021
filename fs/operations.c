@@ -43,8 +43,8 @@ void split_parent_child_from_path(char * path, char ** parent, char ** child) {
 /*
  * Initializes tecnicofs and creates root node.
  */
-void init_fs() {
-	inode_table_init();
+void init_fs(char mode) {	
+	inode_table_init(mode);
 	
 	/* create root inode */
 	int root = inode_create(T_DIRECTORY);
@@ -114,7 +114,6 @@ int lookup_sub_node(char *name, DirEntry *entries) {
  * Returns: SUCCESS or FAIL
  */
 int create(char *name, type nodeType){
-
 	int parent_inumber, child_inumber;
 	char *parent_name, *child_name, name_copy[MAX_FILE_NAME];
 	/* use for copy */
@@ -125,7 +124,7 @@ int create(char *name, type nodeType){
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
 	parent_inumber = lookup(parent_name);
-
+	
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
 		        name, parent_name);
@@ -206,7 +205,7 @@ int delete(char *name){
 	}
 
 	inode_get(child_inumber, &cType, &cdata);
-
+	
 	if (cType == T_DIRECTORY && is_dir_empty(cdata.dirEntries) == FAIL) {
 		printf("could not delete %s: is a directory and not empty\n",
 		       name);

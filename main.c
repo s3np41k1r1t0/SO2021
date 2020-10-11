@@ -22,57 +22,6 @@ int headQueue = 0;
 
 pthread_mutex_t mutex_comandos = PTHREAD_MUTEX_INITIALIZER;
 
-char mode;
-
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_rwlock_t rwlock_w = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t rwlock_r = PTHREAD_RWLOCK_INITIALIZER;
-
-int cond = 0;
-
-void lock_read(){
-    switch(mode){
-        case('m'):
-            pthread_mutex_lock(&mutex);
-            break;
-        case('r'):
-            pthread_rwlock_rdlock(&rwlock_r);
-            pthread_rwlock_wrlock(&rwlock_w);
-            break;
-        default:
-            break;
-    }
-}
-
-void lock_write(){
-    switch(mode){
-        case('m'):
-            pthread_mutex_lock(&mutex);
-            break;
-        case('r'):
-            pthread_rwlock_rdlock(&rwlock_r);
-            pthread_rwlock_wrlock(&rwlock_w);
-            break;
-        default:
-            break;
-    }
-}
-
-void unlock(){
-    switch(mode){
-        case('m'):
-            pthread_mutex_unlock(&mutex);
-            break;
-        case('r'):
-            pthread_rwlock_unlock(&rwlock_r);
-            pthread_rwlock_unlock(&rwlock_w);
-            break;
-        default:
-            break;
-    }
-}
-
-
 int insertCommand(char* data) {
     if(numberCommands != MAX_COMMANDS) {
         strcpy(inputCommands[numberCommands++], data);
@@ -163,15 +112,11 @@ void applyCommand(){
             switch (type) {
                 case 'f':
                     printf("Create file: %s\n", name);
-                    lock_write();
                     create(name, T_FILE);
-                    unlock();
                     break;
                 case 'd':
                     printf("Create directory: %s\n", name);
-                    lock_write();
                     create(name, T_DIRECTORY);
-                    unlock();
                     break;
                 default:
                     fprintf(stderr, "Error: invalid node type\n");
@@ -179,9 +124,7 @@ void applyCommand(){
             }
             break;
         case 'l': 
-            lock_read();
             searchResult = lookup(name);
-            unlock();
             if (searchResult >= 0)
                 printf("Search: %s found\n", name);
             else
@@ -189,9 +132,7 @@ void applyCommand(){
             break;
         case 'd':
             printf("Delete: %s\n", name);
-            lock_write();
             delete(name);
-            unlock();
             break;
         default: { /* error */
             fprintf(stderr, "Error: command to apply\n");
@@ -256,9 +197,7 @@ int main(int argc, char ** argv){
    
     //validates the synchstrategy parameter and applies all commands previously read
     //implement strcmp with macros
-    mode = check_strategy(strategy);
-    
-    init_fs();
+    init_fs(check_strategy(strategy));
 
     FILE *inputfile, *outputfile;
     inputfile = fopen(argv[1],"r");
