@@ -210,9 +210,12 @@ int main(int argc, char ** argv){
     if(argc != 5) exit(EXIT_FAILURE);
 
     struct timeval start_time, end_time;
-    double time_interval;
+    double delta;
 
-    gettimeofday(&start_time,NULL);
+    if (gettimeofday(&start_time,NULL) != 0){
+        fprintf(stderr,"Error getting the time of the day\n");
+        exit(EXIT_FAILURE);
+    }
 
     //validates the synchstrategy parameter and applies all commands previously read
     //implement strcmp with macros
@@ -245,12 +248,14 @@ int main(int argc, char ** argv){
     
     destroy_fs();
     
-    gettimeofday(&end_time,NULL);
-
+    if (gettimeofday(&end_time,NULL) != 0){
+        fprintf(stderr,"Error getting the time of the day\n");
+        exit(EXIT_FAILURE);
+    }
     //calculates time diff and displays benchmark
-    time_interval = (end_time.tv_sec - start_time.tv_sec);
-    time_interval += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // us to sec
-    printf("TecnicoFS completed in %.4f seconds.\n",time_interval);
+    delta = (end_time.tv_sec - start_time.tv_sec);
+    delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // us to sec
+    printf("TecnicoFS completed in %.4f seconds.\n",delta);
 
     exit(EXIT_SUCCESS);
 }
