@@ -29,10 +29,10 @@ clean:
 	./tecnicofs inputs/$@ output.out 1 nosync > stdin.last
 	diff <(sort <(head -n -1 stdin.last)) <(sort <(head -n -1 $<))
 	diff <(sort output.out) <(sort outputs/$@)
-	./tecnicofs inputs/$@ output.out 3 rwlock > stdin.last
+	./tecnicofs inputs/$@ output.out 3 mutex > stdin.last
 	diff <(sort <(head -n -1 stdin.last)) <(sort <(head -n -1 $<))
 	diff <(sort output.out) <(sort outputs/$@)
-	./tecnicofs inputs/$@ output.out 3 mutex > stdin.last
+	./tecnicofs inputs/$@ output.out 3 rwlock > stdin.last
 	diff <(sort <(head -n -1 stdin.last)) <(sort <(head -n -1 $<))
 	diff <(sort output.out) <(sort outputs/$@)
 
