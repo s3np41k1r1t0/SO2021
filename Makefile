@@ -10,7 +10,6 @@ build: tecnicofs
 
 tecnicofs: fs/state.o fs/operations.o main.o
 	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs fs/state.o fs/operations.o main.o
-	rm -f fs/*.o *.o *.out *.last
 
 fs/state.o: fs/state.c fs/state.h tecnicofs-api-constants.h
 	$(CC) $(CFLAGS) -o fs/state.o -c fs/state.c
@@ -37,4 +36,11 @@ clean:
 	diff <(sort output.out) <(sort outputs/$@)
 
 test: test1.txt test2.txt test3.txt test4.txt
-test3: test3.txt
+
+test%: inputs/test%.txt
+	./tecnicofs $< output.out 1 nosync
+	read -n 1
+	./tecnicofs $< output.out 3 mutex
+	read -n 1
+	./tecnicofs $< output.out 3 rwlock
+	

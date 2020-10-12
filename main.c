@@ -146,11 +146,23 @@ void applyCommands(){
     memset(&tid,0,sizeof(tid));
 
     while (numberCommands > 0){
-        for(int i = 0; i < numberThreads && numberCommands > 0; i++)    
-            pthread_create(&(tid[i]),NULL,(void *) &applyCommand,NULL);
-    
-        for(int i = 0; i < numberThreads; i++)
-            if(tid[i] != 0) tid[i] = pthread_join(tid[i],NULL); 
+        for(int i = 0; i < numberThreads && numberCommands > 0; i++){    
+            if(pthread_create(&(tid[i]),NULL,(void *) &applyCommand,NULL) != 0){
+                fprintf(stderr,"Error creating thread\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        for(int i = 0; i < numberThreads; i++){
+            if(tid[i] != 0){
+                if(pthread_join(tid[i],NULL) != 0){
+                    fprintf(stderr,"Error joining thread\n");
+                    exit(EXIT_FAILURE);
+                }; 
+            }
+            tid[i] = 0;
+        }
+           
     }
 }
 
