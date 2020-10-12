@@ -90,7 +90,8 @@ void processInput(FILE *input){
 }
 
 void applyCommand(){
-    pthread_mutex_lock(&mutex_comandos);
+    //WARNING: TODO: check all functions
+    pthread_mutex_lock(&mutex_comandos) ;
     const char* command = removeCommand();
     pthread_mutex_unlock(&mutex_comandos);
 
@@ -204,7 +205,7 @@ int main(int argc, char ** argv){
 
     char *strategy = argv[4];
     
-    //starts measuring time in clock cicles to archive better accuracy than time(NULL)
+    //use time to measure time
     clock_t start = clock();
    
     //validates the synchstrategy parameter and applies all commands previously read

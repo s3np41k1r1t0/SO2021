@@ -9,10 +9,36 @@
 inode_t inode_table[INODE_TABLE_SIZE];
 char mode;
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_mutex_t mutex;
+pthread_rwlock_t rwlock;
 
 int cond = 0;
+
+void init(){
+    switch(mode){
+        case('m'):
+            pthread_mutex_init(&mutex, NULL);
+            break;
+        case('r'):
+            pthread_rwlock_init(&rwlock, NULL);
+            break;
+        default:
+            break;
+    }
+}
+
+void destroy(){
+    switch(mode){
+        case('m'):
+            pthread_mutex_destroy(&mutex);
+            break;
+        case('r'):
+            pthread_rwlock_destroy(&rwlock);
+            break;
+        default:
+            break;
+    }
+}
 
 void lock_read(){
     switch(mode){
@@ -65,7 +91,8 @@ void insert_delay(int cycles) {
  */
 void inode_table_init(char _mode) {
     mode = _mode;
-
+    init();
+    
     for (int i = 0; i < INODE_TABLE_SIZE; i++) {
         inode_table[i].nodeType = T_NONE;
         inode_table[i].data.dirEntries = NULL;
@@ -86,6 +113,8 @@ void inode_table_destroy() {
             free(inode_table[i].data.dirEntries);
         }
     }
+
+    destroy();
 }
 
 /*
@@ -149,11 +178,16 @@ int inode_delete(int inumber) {
 
     lock_write();
     inode_table[inumber].nodeType = T_NONE;
+    unlock();
 
+    lock_read();
     /* see inode_table_destroy function */
-    if (inode_table[inumber].data.dirEntries)
+    if (inode_table[inumber].data.dirEntries){
+        unlock();
+        lock_write();
         free(inode_table[inumber].data.dirEntries);
-    
+    }
+
     unlock();
     return SUCCESS;
 }
@@ -222,6 +256,8 @@ int dir_reset_entry(int inumber, int sub_inumber) {
     
     for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
         if (inode_table[inumber].data.dirEntries[i].inumber == sub_inumber) {
+            unlock();
+            lock_write();
             inode_table[inumber].data.dirEntries[i].inumber = FREE_INODE;
             inode_table[inumber].data.dirEntries[i].name[0] = '\0';
             unlock();
