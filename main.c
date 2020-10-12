@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/time.h>
 #include "fs/operations.h"
 #include <pthread.h>
 
@@ -90,10 +91,17 @@ void processInput(FILE *input){
 }
 
 void applyCommand(){
-    //WARNING: TODO: check all functions
-    pthread_mutex_lock(&mutex_comandos) ;
+    if(pthread_mutex_lock(&mutex_comandos) != 0){
+        fprintf(stderr,"Error locking mutex\n");
+        exit(EXIT_FAILURE);
+    }
+
     const char* command = removeCommand();
-    pthread_mutex_unlock(&mutex_comandos);
+
+    if(pthread_mutex_unlock(&mutex_comandos) != 0){
+        fprintf(stderr,"Error unlocking mutex\n");
+        exit(EXIT_FAILURE);
+    }
 
     if (command == NULL){
         return;
@@ -172,10 +180,8 @@ char check_strategy(char *strategy){
     if(!strcmp(strategy,NOSYNC) || !strcmp(strategy,MUTEX) || !strcmp(strategy,RWLOCK))
         return strategy[0];    
     
-    else{
-        fprintf(stderr,"Invalid sync strategy\n");
-        exit(EXIT_FAILURE);
-    }
+    fprintf(stderr,"Invalid sync strategy\n");
+    exit(EXIT_FAILURE);
 }
 
 void check_inputfile(FILE *inputfile){
@@ -203,14 +209,14 @@ void check_outputfile(FILE *outputfile){
 int main(int argc, char ** argv){
     if(argc != 5) exit(EXIT_FAILURE);
 
-    char *strategy = argv[4];
-    
-    //use time to measure time
-    clock_t start = clock();
-   
+    struct timeval start_time, end_time;
+    double time_interval;
+
+    gettimeofday(&start_time,NULL);
+
     //validates the synchstrategy parameter and applies all commands previously read
     //implement strcmp with macros
-    init_fs(check_strategy(strategy));
+    init_fs(check_strategy(argv[4]));
 
     FILE *inputfile, *outputfile;
     inputfile = fopen(argv[1],"r");
@@ -221,7 +227,7 @@ int main(int argc, char ** argv){
     numberThreads = atoi(argv[3]);
     
     //validates numthreads parameter
-    check_numberThreads(numberThreads, strategy);
+    check_numberThreads(numberThreads, argv[4]);
 
     //reads all the commands from the input file
     processInput(inputfile);
@@ -239,11 +245,12 @@ int main(int argc, char ** argv){
     
     destroy_fs();
     
-    clock_t end = clock();
-    
+    gettimeofday(&end_time,NULL);
+
     //calculates time diff and displays benchmark
-    double delta = ((double)end-start)/CLOCKS_PER_SEC;
-    printf("TecnicoFS completed in %.4f seconds.\n",delta);
+    time_interval = (end_time.tv_sec - start_time.tv_sec);
+    time_interval += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // us to sec
+    printf("TecnicoFS completed in %.4f seconds.\n",time_interval);
 
     exit(EXIT_SUCCESS);
 }

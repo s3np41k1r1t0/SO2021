@@ -17,10 +17,16 @@ int cond = 0;
 void init(){
     switch(mode){
         case('m'):
-            pthread_mutex_init(&mutex, NULL);
+            if(pthread_mutex_init(&mutex, NULL) != 0){
+                fprintf(stderr,"Error initializing mutex\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         case('r'):
-            pthread_rwlock_init(&rwlock, NULL);
+            if(pthread_rwlock_init(&rwlock, NULL) != 0){
+                fprintf(stderr,"Error initializing rwlock\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         default:
             break;
@@ -30,10 +36,16 @@ void init(){
 void destroy(){
     switch(mode){
         case('m'):
-            pthread_mutex_destroy(&mutex);
+            if(pthread_mutex_destroy(&mutex) != 0){
+                fprintf(stderr,"Error destroying mutex\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         case('r'):
-            pthread_rwlock_destroy(&rwlock);
+            if(pthread_rwlock_destroy(&rwlock) != 0){
+                fprintf(stderr,"Error destroying rwlock\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         default:
             break;
@@ -43,10 +55,16 @@ void destroy(){
 void lock_read(){
     switch(mode){
         case('m'):
-            pthread_mutex_lock(&mutex);
+            if(pthread_mutex_lock(&mutex) != 0){
+                fprintf(stderr,"Error locking mutex\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         case('r'):
-            pthread_rwlock_rdlock(&rwlock);
+            if(pthread_rwlock_rdlock(&rwlock) != 0){
+                fprintf(stderr,"Error locking rwlock\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         default:
             break;
@@ -56,10 +74,16 @@ void lock_read(){
 void lock_write(){
     switch(mode){
         case('m'):
-            pthread_mutex_lock(&mutex);
+            if(pthread_mutex_lock(&mutex) != 0){
+                fprintf(stderr,"Error locking mutex\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         case('r'):
-            pthread_rwlock_wrlock(&rwlock);
+            if(pthread_rwlock_wrlock(&rwlock) != 0){
+                fprintf(stderr,"Error locking rwlock\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         default:
             break;
@@ -69,10 +93,16 @@ void lock_write(){
 void unlock(){
     switch(mode){
         case('m'):
-            pthread_mutex_unlock(&mutex);
+            if(pthread_mutex_unlock(&mutex) != 0){
+                fprintf(stderr,"Error unlocking mutex\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         case('r'):
-            pthread_rwlock_unlock(&rwlock);
+            if(pthread_rwlock_unlock(&rwlock) != 0){
+                fprintf(stderr,"Error unlocking rwlock\n");
+                exit(EXIT_FAILURE);
+            }
             break;
         default:
             break;
