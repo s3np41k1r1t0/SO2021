@@ -28,13 +28,13 @@ clean:
 %.txt: outputs/%.stdin
 	./tecnicofs inputs/$@ output.out 1 nosync > stdin.last
 	#diff <(sort <(head -n -1 stdin.last)) <(sort <(head -n -1 $<))
-	diff <(sort output.out) <(sort outputs/$@)
+	#diff <(sort output.out) <(sort outputs/$@)
 	./tecnicofs inputs/$@ output.out 3 mutex > stdin.last
 	#diff <(sort <(head -n -1 stdin.last)) <(sort <(head -n -1 $<))
-	diff <(sort output.out) <(sort outputs/$@)
+	#diff <(sort output.out) <(sort outputs/$@)
 	./tecnicofs inputs/$@ output.out 3 rwlock > stdin.last
 	#diff <(sort <(head -n -1 stdin.last)) <(sort <(head -n -1 $<))
-	diff <(sort output.out) <(sort outputs/$@)
+	#diff <(sort output.out) <(sort outputs/$@)
 
 test: test1.txt test2.txt test3.txt test4.txt
 
