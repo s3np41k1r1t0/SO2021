@@ -5,6 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/time.h>
+#include <sys/errno.h>
 #include "fs/operations.h"
 #include <pthread.h>
 
@@ -21,7 +22,40 @@ char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
 int headQueue = 0;
 
-pthread_mutex_t mutex_comandos = PTHREAD_MUTEX_INITIALIZER;
+//mutex para proteger os comandos de input
+pthread_mutex_t mutex_comandos;
+
+//inicializa o mutex dos comandos
+void command_mutex_init(){
+    if(pthread_mutex_init(&mutex_comandos, NULL) != 0){
+        fprintf(stderr,"Error initializing mutex\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//destoi o mutex dos comandos
+void command_mutex_destroy(){
+    if(pthread_mutex_destroy(&mutex_comandos) != 0){
+        fprintf(stderr,"Error initializing mutex\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//bloqueia o mutex dos comandos
+void command_lock(){
+    if(pthread_mutex_lock(&mutex_comandos) != 0){
+        fprintf(stderr,"Error locking mutex\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//desbloqueia o mutex dos comandos
+void command_unlock(){
+    if(pthread_mutex_unlock(&mutex_comandos) != 0){
+        fprintf(stderr,"Error unlocking mutex\n");
+        exit(EXIT_FAILURE);
+    }
+}
 
 int insertCommand(char* data) {
     if(numberCommands != MAX_COMMANDS) {
@@ -91,19 +125,11 @@ void processInput(FILE *input){
 }
 
 void applyCommand(){
-    if(pthread_mutex_lock(&mutex_comandos) != 0){
-        fprintf(stderr,"Error locking mutex\n");
-        exit(EXIT_FAILURE);
-    }
-
+    //protege a var global numberCommands e a queue de comandos
+    command_lock();
     while (numberCommands > 0){
-
         const char* command = removeCommand();
-
-        if(pthread_mutex_unlock(&mutex_comandos) != 0){
-            fprintf(stderr,"Error unlocking mutex\n");
-            exit(EXIT_FAILURE);
-        }
+        command_unlock();
 
         if (command == NULL){
             return;
@@ -150,16 +176,9 @@ void applyCommand(){
                 exit(EXIT_FAILURE);
             }
         }
-    
-        if(pthread_mutex_lock(&mutex_comandos) != 0){
-            fprintf(stderr,"Error locking mutex\n");
-            exit(EXIT_FAILURE);
-        }
+        command_lock(); 
     }
-    if(pthread_mutex_unlock(&mutex_comandos) != 0){
-        fprintf(stderr,"Error unlocking mutex\n");
-        exit(EXIT_FAILURE);
-    }
+    command_unlock();
 }
 
 void applyCommands(){
@@ -184,7 +203,7 @@ void applyCommands(){
     }
 }
 
-
+//verifica se a estrategia eh valida e retorna o char correspondente 'a estrategia escolhida 
 char check_strategy(char *strategy){
     if(!strcmp(strategy,NOSYNC) || !strcmp(strategy,MUTEX) || !strcmp(strategy,RWLOCK))
         return strategy[0];    
@@ -193,6 +212,7 @@ char check_strategy(char *strategy){
     exit(EXIT_FAILURE);
 }
 
+//verifica se o ficheiro de input eh valido
 void check_inputfile(FILE *inputfile){
     if(inputfile == NULL){ 
         fprintf(stderr,"Something went wrong while opening the files, please check if input file exists\n");
@@ -200,13 +220,16 @@ void check_inputfile(FILE *inputfile){
     }
 }
 
-void check_numberThreads(int numberThreads, char *strategy){
-    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy, NOSYNC))){
+//verifica se o numero de threads eh valido e se o atoi retornou algum erro
+void check_numberThreads(char *numT, char *strategy){
+    numberThreads = atoi(numT);
+    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy, NOSYNC)) || errno != 0){
         fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
         exit(EXIT_FAILURE);
     }
 }
 
+//verfica se o ficheiro de output eh valido
 void check_outputfile(FILE *outputfile){
     if(outputfile == NULL){
         fprintf(stderr,"Cannot open/create output file\n");
@@ -214,54 +237,58 @@ void check_outputfile(FILE *outputfile){
     }
 }
 
-//Usage: ./tecnicofs <inputfile> <outputfile> numthreads synchstrategy
-int main(int argc, char ** argv){
-    if(argc != 5) exit(EXIT_FAILURE);
-
-    struct timeval start_time, end_time;
-    double delta;
-
-    if (gettimeofday(&start_time,NULL) != 0){
+//coloca o valor do tempo atual na estrutura time
+void getTime(struct timeval *time){
+    if (gettimeofday(time,NULL) != 0){
         fprintf(stderr,"Error getting the time of the day\n");
         exit(EXIT_FAILURE);
     }
+}
+
+int main(int argc, char ** argv){
+    struct timeval start_time, end_time;
+    double delta;
+    FILE *inputfile, *outputfile;
+   
+    //verifica o numero de argumentos
+    if(argc != 5){
+        fprintf(stderr,"Usage: ./tecnicofs <inputfile> <outputfile> numthreads synchstrategy\n");
+        exit(EXIT_FAILURE);
+    }
+
+    getTime(&start_time);    
 
     //validates the synchstrategy parameter and applies all commands previously read
-    //implement strcmp with macros
     init_fs(check_strategy(argv[4]));
-
-    FILE *inputfile, *outputfile;
-    inputfile = fopen(argv[1],"r");
-
-    //validates if user has permissions to open input file and if it exists
-    check_inputfile(inputfile);
-     
-    numberThreads = atoi(argv[3]);
+    
+    command_mutex_init();
     
     //validates numthreads parameter
-    check_numberThreads(numberThreads, argv[4]);
+    check_numberThreads(argv[3], argv[4]);
 
-    //reads all the commands from the input file
+    //validates if user has permissions to open input file and if it exists
+    inputfile = fopen(argv[1],"r"); 
+    check_inputfile(inputfile);
+    
+    //reads all the commands from the input file and closes files
     processInput(inputfile);
     fclose(inputfile);
 
+    //runs operations on filesystem
     applyCommands();
 
-    //writes output to output file
+    //opens outputfile, writes output and closes output file
     outputfile = fopen(argv[2],"w");
-    
     check_outputfile(outputfile); 
-
     print_tecnicofs_tree(outputfile);
-    fclose(outputfile);
+    fclose(outputfile); 
     
+    //destroys filesystem and mutex/rwlocks
     destroy_fs();
-    
-    if (gettimeofday(&end_time,NULL) != 0){
-        fprintf(stderr,"Error getting the time of the day\n");
-        exit(EXIT_FAILURE);
-    }
+    command_mutex_destroy();
+
     //calculates time diff and displays benchmark
+    getTime(&end_time);   
     delta = (end_time.tv_sec - start_time.tv_sec);
     delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // us to sec
     printf("TecnicoFS completed in %.4f seconds.\n",delta);

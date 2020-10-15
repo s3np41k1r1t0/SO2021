@@ -6,23 +6,30 @@
 #include "state.h"
 #include "../tecnicofs-api-constants.h"
 
+#define MUTEX_C 'm'
+#define RWLOCK_C 'r'
+
 inode_t inode_table[INODE_TABLE_SIZE];
+
+//variavel que controla qual o sistema de trico a usar caso nao haja
+//caso a variavel nao corresponda a MUTEX ou RWLOCK as funcoes 
+//correspondentes aos trincos nao fazem nada
 char mode;
 
+//trincos que protegem o filesystem
 pthread_mutex_t mutex;
 pthread_rwlock_t rwlock;
 
-int cond = 0;
-
+//inicializa o trinco escolhido
 void init(){
     switch(mode){
-        case('m'):
+        case(MUTEX_C):
             if(pthread_mutex_init(&mutex, NULL) != 0){
                 fprintf(stderr,"Error initializing mutex\n");
                 exit(EXIT_FAILURE);
             }
             break;
-        case('r'):
+        case(RWLOCK_C):
             if(pthread_rwlock_init(&rwlock, NULL) != 0){
                 fprintf(stderr,"Error initializing rwlock\n");
                 exit(EXIT_FAILURE);
@@ -33,15 +40,16 @@ void init(){
     }
 }
 
+//destroi o trinco escolhido
 void destroy(){
     switch(mode){
-        case('m'):
+        case(MUTEX_C):
             if(pthread_mutex_destroy(&mutex) != 0){
                 fprintf(stderr,"Error destroying mutex\n");
                 exit(EXIT_FAILURE);
             }
             break;
-        case('r'):
+        case(RWLOCK_C):
             if(pthread_rwlock_destroy(&rwlock) != 0){
                 fprintf(stderr,"Error destroying rwlock\n");
                 exit(EXIT_FAILURE);
@@ -52,15 +60,16 @@ void destroy(){
     }
 }
 
+//bloqueia a leitura com o trinco escolhido
 void lock_read(){
     switch(mode){
-        case('m'):
+        case(MUTEX_C):
             if(pthread_mutex_lock(&mutex) != 0){
                 fprintf(stderr,"Error locking mutex\n");
                 exit(EXIT_FAILURE);
             }
             break;
-        case('r'):
+        case(RWLOCK_C):
             if(pthread_rwlock_rdlock(&rwlock) != 0){
                 fprintf(stderr,"Error locking rwlock\n");
                 exit(EXIT_FAILURE);
@@ -71,15 +80,16 @@ void lock_read(){
     }
 }
 
+//bloqueia a escrita com o trinco escolhido
 void lock_write(){
     switch(mode){
-        case('m'):
+        case(MUTEX_C):
             if(pthread_mutex_lock(&mutex) != 0){
                 fprintf(stderr,"Error locking mutex\n");
                 exit(EXIT_FAILURE);
             }
             break;
-        case('r'):
+        case(RWLOCK_C):
             if(pthread_rwlock_wrlock(&rwlock) != 0){
                 fprintf(stderr,"Error locking rwlock\n");
                 exit(EXIT_FAILURE);
@@ -90,15 +100,16 @@ void lock_write(){
     }
 }
 
+//desbloqueia a leitura/escrita com o trinco escolhido
 void unlock(){
     switch(mode){
-        case('m'):
+        case(MUTEX_C):
             if(pthread_mutex_unlock(&mutex) != 0){
                 fprintf(stderr,"Error unlocking mutex\n");
                 exit(EXIT_FAILURE);
             }
             break;
-        case('r'):
+        case(RWLOCK_C):
             if(pthread_rwlock_unlock(&rwlock) != 0){
                 fprintf(stderr,"Error unlocking rwlock\n");
                 exit(EXIT_FAILURE);
