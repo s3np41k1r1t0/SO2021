@@ -128,9 +128,9 @@ void processInput(FILE *input){
 }
 
 void applyCommand(){
-    //protege a var global numberCommands e a queue de comandos
-    command_lock();
-    while (numberCommands > 0){
+    while (1){
+        //protege a var global numberCommands e a queue de comandos
+        command_lock();
         const char* command = removeCommand();
         command_unlock();
         
@@ -179,9 +179,7 @@ void applyCommand(){
                 exit(EXIT_FAILURE);
             }
         }
-        command_lock(); 
     }
-    command_unlock();
 }
 
 //cria as threads e junta-as
