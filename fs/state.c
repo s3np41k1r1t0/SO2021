@@ -170,12 +170,9 @@ int inode_create(type nType) {
     /* Used for testing synchronization speedup */
     insert_delay(DELAY);
 
-    lock_read();
+    lock_write();
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
         if (inode_table[inumber].nodeType == T_NONE) {
-            unlock();
-
-            lock_write();
             inode_table[inumber].nodeType = nType;
 
             if (nType == T_DIRECTORY) {
@@ -209,23 +206,17 @@ int inode_delete(int inumber) {
     /* Used for testing synchronization speedup */
     insert_delay(DELAY);
     
-    lock_read();
+    lock_write();
     if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
         printf("inode_delete: invalid inumber\n");
         unlock();
         return FAIL;
     } 
-    unlock();
 
-    lock_write();
     inode_table[inumber].nodeType = T_NONE;
-    unlock();
 
-    lock_read();
     /* see inode_table_destroy function */
     if (inode_table[inumber].data.dirEntries){
-        unlock();
-        lock_write();
         free(inode_table[inumber].data.dirEntries);
     }
 
@@ -275,7 +266,7 @@ int dir_reset_entry(int inumber, int sub_inumber) {
     /* Used for testing synchronization speedup */
     insert_delay(DELAY);
     
-    lock_read();
+    lock_write();
     if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
         printf("inode_reset_entry: invalid inumber\n");
         unlock();
@@ -297,8 +288,6 @@ int dir_reset_entry(int inumber, int sub_inumber) {
     
     for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
         if (inode_table[inumber].data.dirEntries[i].inumber == sub_inumber) {
-            unlock();
-            lock_write();
             inode_table[inumber].data.dirEntries[i].inumber = FREE_INODE;
             inode_table[inumber].data.dirEntries[i].name[0] = '\0';
             unlock();
@@ -323,7 +312,7 @@ int dir_add_entry(int inumber, int sub_inumber, char *sub_name) {
     /* Used for testing synchronization speedup */
     insert_delay(DELAY);
 
-    lock_read();
+    lock_write();
     if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
         printf("inode_add_entry: invalid inumber\n");
         unlock();
@@ -351,8 +340,6 @@ int dir_add_entry(int inumber, int sub_inumber, char *sub_name) {
     
     for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
         if (inode_table[inumber].data.dirEntries[i].inumber == FREE_INODE) {
-            unlock();
-            lock_write();
             inode_table[inumber].data.dirEntries[i].inumber = sub_inumber;
             strcpy(inode_table[inumber].data.dirEntries[i].name, sub_name);
             unlock();
