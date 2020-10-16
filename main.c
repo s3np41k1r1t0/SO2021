@@ -207,14 +207,6 @@ char check_strategy(char *strategy){
     exit(EXIT_FAILURE);
 }
 
-//verifica se o ficheiro de input eh valido
-void check_inputfile(FILE *inputfile){
-    if(inputfile == NULL){ 
-        fprintf(stderr,"Something went wrong while opening the files, please check if input file exists\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
 //verifica se o numero de threads eh valido
 void check_numberThreads(char *numT, char *strategy){
     numberThreads = atoi(numT);
@@ -224,15 +216,7 @@ void check_numberThreads(char *numT, char *strategy){
     }
 }
 
-//verfica se o ficheiro de output eh valido
-void check_outputfile(FILE *outputfile){
-    if(outputfile == NULL){
-        fprintf(stderr,"Cannot open/create output file\n");
-        exit(EXIT_SUCCESS);        
-    }
-}
-
-//verifica se o ficheiro foi aberto sem erros
+//verifica se o ficheiro eh valido e foi aberto sem erros
 void check_file_open(FILE *file, char *file_name){
     if(file == NULL){
         fprintf(stderr,"Cannot open/create file: %s\n", file_name);
