@@ -11,7 +11,7 @@
 
 inode_t inode_table[INODE_TABLE_SIZE];
 
-//variavel que controla qual o sistema de trico a usar caso nao haja
+//variavel que controla qual o sistema de trinco a usar
 //caso a variavel nao corresponda a MUTEX ou RWLOCK as funcoes 
 //correspondentes aos trincos nao fazem nada
 char mode;

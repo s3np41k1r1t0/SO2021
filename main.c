@@ -5,7 +5,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/time.h>
-#include <sys/errno.h>
 #include "fs/operations.h"
 #include <pthread.h>
 
@@ -33,7 +32,7 @@ void command_mutex_init(){
     }
 }
 
-//destoi o mutex dos comandos
+//destroi o mutex dos comandos
 void command_mutex_destroy(){
     if(pthread_mutex_destroy(&mutex_comandos) != 0){
         fprintf(stderr,"Error initializing mutex\n");
@@ -129,11 +128,10 @@ void applyCommand(){
     command_lock();
     while (numberCommands > 0){
         const char* command = removeCommand();
-        command_unlock();
-
         if (command == NULL){
-            return;
+            continue;
         }
+        command_unlock();
 
         char token, type;
         char name[MAX_INPUT_SIZE];
@@ -181,11 +179,11 @@ void applyCommand(){
     command_unlock();
 }
 
+//cria as threads e junta-as
 void applyCommands(){
     pthread_t tid[numberThreads];
-    memset(&tid,0,sizeof(tid));
 
-    for(int i = 0; i < numberThreads && numberCommands > 0; i++){    
+    for(int i = 0; i < numberThreads; i++){    
         if(pthread_create(&(tid[i]),NULL,(void *) &applyCommand,NULL) != 0){
             fprintf(stderr,"Error creating thread\n");
             exit(EXIT_FAILURE);
@@ -193,13 +191,10 @@ void applyCommands(){
     }
 
     for(int i = 0; i < numberThreads; i++){
-        if(tid[i] != 0){
-            if(pthread_join(tid[i],NULL) != 0){
-                fprintf(stderr,"Error joining thread\n");
-                exit(EXIT_FAILURE);
-            }; 
+        if(pthread_join(tid[i],NULL) != 0){
+            fprintf(stderr,"Error joining thread\n");
+            exit(EXIT_FAILURE);
         }
-        tid[i] = 0;
     }
 }
 
@@ -220,10 +215,10 @@ void check_inputfile(FILE *inputfile){
     }
 }
 
-//verifica se o numero de threads eh valido e se o atoi retornou algum erro
+//verifica se o numero de threads eh valido
 void check_numberThreads(char *numT, char *strategy){
     numberThreads = atoi(numT);
-    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy, NOSYNC)) || errno != 0){
+    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy, NOSYNC))){
         fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
         exit(EXIT_FAILURE);
     }
@@ -237,8 +232,24 @@ void check_outputfile(FILE *outputfile){
     }
 }
 
+//verifica se o ficheiro foi aberto sem erros
+void check_file_open(FILE *file, char *file_name){
+    if(file == NULL){
+        fprintf(stderr,"Cannot open/create file: %s\n", file_name);
+        exit(EXIT_SUCCESS);
+    }
+}
+
+//fecha o ficheiro e verifica se o fechou sem erros
+void close_file(FILE *file, char *file_name){
+    if(fclose(file) != 0){
+        fprintf(stderr,"Cannot close file: %s\n", file_name);
+        exit(EXIT_SUCCESS);        
+    }
+}
+
 //coloca o valor do tempo atual na estrutura time
-void getTime(struct timeval *time){
+void get_time(struct timeval *time){
     if (gettimeofday(time,NULL) != 0){
         fprintf(stderr,"Error getting the time of the day\n");
         exit(EXIT_FAILURE);
@@ -256,41 +267,41 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    getTime(&start_time);    
+    get_time(&start_time);    
 
-    //validates the synchstrategy parameter and applies all commands previously read
+    //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
     init_fs(check_strategy(argv[4]));
     
     command_mutex_init();
     
-    //validates numthreads parameter
+    //verifica o parametro do numero de threads
     check_numberThreads(argv[3], argv[4]);
 
-    //validates if user has permissions to open input file and if it exists
+    //verifica se o utilizador tem permissoes para abrir o ficheiro e se ele existe
     inputfile = fopen(argv[1],"r"); 
-    check_inputfile(inputfile);
+    check_file_open(inputfile, argv[1]);
     
-    //reads all the commands from the input file and closes files
+    //le todos os comandos a partir do inputfile e fecha-o
     processInput(inputfile);
-    fclose(inputfile);
+    close_file(inputfile, argv[1]);
 
-    //runs operations on filesystem
+    //corre as operacoes do filesystem
     applyCommands();
 
-    //opens outputfile, writes output and closes output file
+    //abre o outputfile, escreve o output e fecha o ficheiro
     outputfile = fopen(argv[2],"w");
-    check_outputfile(outputfile); 
+    check_file_open(outputfile, argv[2]);
     print_tecnicofs_tree(outputfile);
-    fclose(outputfile); 
+    close_file(outputfile, argv[2]);
     
-    //destroys filesystem and mutex/rwlocks
+    //destroi o filesystem e os mutex/rwlocks
     destroy_fs();
     command_mutex_destroy();
 
-    //calculates time diff and displays benchmark
-    getTime(&end_time);   
+    //calcula a diferenca de tempo e apresenta o benchmark
+    get_time(&end_time);   
     delta = (end_time.tv_sec - start_time.tv_sec);
-    delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // us to sec
+    delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // microsegundos para segundos
     printf("TecnicoFS completed in %.4f seconds.\n",delta);
 
     exit(EXIT_SUCCESS);
