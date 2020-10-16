@@ -1,3 +1,7 @@
+// Andre Martins Esgalhado - 95533
+// Bruno Miguel Da Silva Mendes - 95544
+// Grupo - 16
+
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
