@@ -243,10 +243,11 @@ void applyCommand(){
     command_lock();
     while (numberCommands > 0){
         const char* command = removeCommand();
-        if (command == NULL){
-            continue;
-        }
         command_unlock();
+        
+        if (command == NULL){
+            return;
+        }
 
         char token, type;
         char name[MAX_INPUT_SIZE];
