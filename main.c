@@ -375,7 +375,8 @@ int main(int argc, char ** argv){
     get_time(&start_time);    
 
     //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
-    init_fs(check_strategy(argv[4]));
+    mode = check_strategy(argv[4]);
+    init_fs();
     
     init_locks();
     command_mutex_init();
