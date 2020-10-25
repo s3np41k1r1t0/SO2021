@@ -319,20 +319,11 @@ void applyCommands(){
     }
 }
 
-//verifica se a estrategia eh valida e retorna o char correspondente 'a estrategia escolhida 
-char check_strategy(char *strategy){
-    if(!strcmp(strategy,NOSYNC) || !strcmp(strategy,MUTEX) || !strcmp(strategy,RWLOCK))
-        return strategy[0];    
-    
-    fprintf(stderr,"Invalid sync strategy\n");
-    exit(EXIT_FAILURE);
-}
-
 //verifica se o numero de threads eh valido
-void check_numberThreads(char *numT, char *strategy){
+void check_numberThreads(char *numT){
     numberThreads = atoi(numT);
-    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy, NOSYNC))){
-        fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
+    if(numberThreads < 1 ){
+        fprintf(stderr,"Invalid number of threads (must be greater than 0)\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -367,22 +358,22 @@ int main(int argc, char ** argv){
     FILE *inputfile, *outputfile;
    
     //verifica o numero de argumentos
-    if(argc != 5){
-        fprintf(stderr,"Usage: ./tecnicofs <inputfile> <outputfile> numthreads synchstrategy\n");
+    if(argc != 4){
+        fprintf(stderr,"Usage: ./tecnicofs <inputfile> <outputfile> numthreads\n");
         exit(EXIT_FAILURE);
     }
 
     get_time(&start_time);    
 
     //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
-    mode = check_strategy(argv[4]);
+    mode = 'r';
     init_fs();
     
     init_locks();
     command_mutex_init();
     
     //verifica o parametro do numero de threads
-    check_numberThreads(argv[3], argv[4]);
+    check_numberThreads(argv[3]);
 
     //verifica se o utilizador tem permissoes para abrir o ficheiro e se ele existe
     inputfile = fopen(argv[1],"r"); 

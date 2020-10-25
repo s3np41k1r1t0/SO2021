@@ -18,7 +18,7 @@ void insert_delay(int cycles) {
 /*
  * Initializes the i-nodes table.
  */
-void inode_table_init(char _mode) {
+void inode_table_init() {
     for (int i = 0; i < INODE_TABLE_SIZE; i++) {
         inode_table[i].nodeType = T_NONE;
         inode_table[i].data.dirEntries = NULL;
