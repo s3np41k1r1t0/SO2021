@@ -18,6 +18,8 @@
 #define NOSYNC "nosync"
 #define MUTEX "mutex"
 #define RWLOCK "rwlock"
+#define MUTEX_C 'm'
+#define RWLOCK_C 'r'
 
 int numberThreads = 0;
 
@@ -27,6 +29,15 @@ int headQueue = 0;
 
 //mutex para proteger os comandos de input
 pthread_mutex_t mutex_comandos;
+
+//variavel que controla qual o sistema de trinco a usar
+//caso a variavel nao corresponda a MUTEX ou RWLOCK as funcoes 
+//correspondentes aos trincos nao fazem nada
+char mode;
+
+//trincos que protegem o filesystem
+pthread_mutex_t mutex;
+pthread_rwlock_t rwlock;
 
 //inicializa o mutex dos comandos
 void command_mutex_init(){
@@ -57,6 +68,106 @@ void command_unlock(){
     if(pthread_mutex_unlock(&mutex_comandos) != 0){
         fprintf(stderr,"Error unlocking mutex\n");
         exit(EXIT_FAILURE);
+    }
+}
+
+//inicializa o trinco escolhido
+void init_locks(){
+    switch(mode){
+        case(MUTEX_C):
+            if(pthread_mutex_init(&mutex, NULL) != 0){
+                fprintf(stderr,"Error initializing mutex\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case(RWLOCK_C):
+            if(pthread_rwlock_init(&rwlock, NULL) != 0){
+                fprintf(stderr,"Error initializing rwlock\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+//destroi o trinco escolhido
+void destroy_locks(){
+    switch(mode){
+        case(MUTEX_C):
+            if(pthread_mutex_destroy(&mutex) != 0){
+                fprintf(stderr,"Error destroying mutex\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case(RWLOCK_C):
+            if(pthread_rwlock_destroy(&rwlock) != 0){
+                fprintf(stderr,"Error destroying rwlock\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+//bloqueia a leitura com o trinco escolhido
+void lock_read(){
+    switch(mode){
+        case(MUTEX_C):
+            if(pthread_mutex_lock(&mutex) != 0){
+                fprintf(stderr,"Error locking mutex\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case(RWLOCK_C):
+            if(pthread_rwlock_rdlock(&rwlock) != 0){
+                fprintf(stderr,"Error locking rwlock\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+//bloqueia a escrita com o trinco escolhido
+void lock_write(){
+    switch(mode){
+        case(MUTEX_C):
+            if(pthread_mutex_lock(&mutex) != 0){
+                fprintf(stderr,"Error locking mutex\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case(RWLOCK_C):
+            if(pthread_rwlock_wrlock(&rwlock) != 0){
+                fprintf(stderr,"Error locking rwlock\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+//desbloqueia a leitura/escrita com o trinco escolhido
+void unlock(){
+    switch(mode){
+        case(MUTEX_C):
+            if(pthread_mutex_unlock(&mutex) != 0){
+                fprintf(stderr,"Error unlocking mutex\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case(RWLOCK_C):
+            if(pthread_rwlock_unlock(&rwlock) != 0){
+                fprintf(stderr,"Error unlocking rwlock\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        default:
+            break;
     }
 }
 
@@ -151,10 +262,12 @@ void applyCommand(){
             case 'c':
                 switch (type) {
                     case 'f':
+                        lock_write();
                         printf("Create file: %s\n", name);
                         create(name, T_FILE);
                         break;
                     case 'd':
+                        lock_write();
                         printf("Create directory: %s\n", name);
                         create(name, T_DIRECTORY);
                         break;
@@ -162,17 +275,22 @@ void applyCommand(){
                         fprintf(stderr, "Error: invalid node type\n");
                         exit(EXIT_FAILURE);
                 }
+                unlock();
                 break;
             case 'l': 
+                lock_read(); 
                 searchResult = lookup(name);
                 if (searchResult >= 0)
                     printf("Search: %s found\n", name);
                 else
                     printf("Search: %s not found\n", name);
+                unlock();
                 break;
             case 'd':
+                lock_write();
                 printf("Delete: %s\n", name);
                 delete(name);
+                unlock();
                 break;
             default: { /* error */
                 fprintf(stderr, "Error: command to apply\n");
@@ -201,20 +319,11 @@ void applyCommands(){
     }
 }
 
-//verifica se a estrategia eh valida e retorna o char correspondente 'a estrategia escolhida 
-char check_strategy(char *strategy){
-    if(!strcmp(strategy,NOSYNC) || !strcmp(strategy,MUTEX) || !strcmp(strategy,RWLOCK))
-        return strategy[0];    
-    
-    fprintf(stderr,"Invalid sync strategy\n");
-    exit(EXIT_FAILURE);
-}
-
 //verifica se o numero de threads eh valido
-void check_numberThreads(char *numT, char *strategy){
+void check_numberThreads(char *numT){
     numberThreads = atoi(numT);
-    if(numberThreads < 1 || (numberThreads != 1 && !strcmp(strategy, NOSYNC))){
-        fprintf(stderr,"Invalid number of threads (must be greater than 0 or 1 if nosync is enabled)\n");
+    if(numberThreads < 1 ){
+        fprintf(stderr,"Invalid number of threads (must be greater than 0)\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -249,24 +358,28 @@ int main(int argc, char ** argv){
     FILE *inputfile, *outputfile;
    
     //verifica o numero de argumentos
-    if(argc != 5){
-        fprintf(stderr,"Usage: ./tecnicofs <inputfile> <outputfile> numthreads synchstrategy\n");
+    if(argc != 4){
+        fprintf(stderr,"Usage: ./tecnicofs <inputfile> <outputfile> numthreads\n");
         exit(EXIT_FAILURE);
     }
 
     get_time(&start_time);    
 
     //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
-    init_fs(check_strategy(argv[4]));
+    mode = 'r';
+    init_fs();
     
+    init_locks();
     command_mutex_init();
     
     //verifica o parametro do numero de threads
-    check_numberThreads(argv[3], argv[4]);
+    check_numberThreads(argv[3]);
 
-    //verifica se o utilizador tem permissoes para abrir o ficheiro e se ele existe
+    //verifica se o utilizador tem permissoes para abrir os ficheiros e se ele existem
     inputfile = fopen(argv[1],"r"); 
     check_file_open(inputfile, argv[1]);
+    outputfile = fopen(argv[2],"w");
+    check_file_open(outputfile, argv[2]);
     
     //le todos os comandos a partir do inputfile e fecha-o
     processInput(inputfile);
@@ -275,15 +388,14 @@ int main(int argc, char ** argv){
     //corre as operacoes do filesystem
     applyCommands();
 
-    //abre o outputfile, escreve o output e fecha o ficheiro
-    outputfile = fopen(argv[2],"w");
-    check_file_open(outputfile, argv[2]);
+    //escreve o output e fecha o ficheiro
     print_tecnicofs_tree(outputfile);
     close_file(outputfile, argv[2]);
     
     //destroi o filesystem e os mutex/rwlocks
     destroy_fs();
     command_mutex_destroy();
+    destroy_locks();
 
     //calcula a diferenca de tempo e apresenta o benchmark
     get_time(&end_time);   
