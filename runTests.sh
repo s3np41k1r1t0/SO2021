@@ -6,7 +6,8 @@ maxthreads=$3
 usage="Usage: ./runTests.sh <inputdir> <outputdir> numthreads"
 
 if test ! -f "tecnicofs"; then
-    make
+    echo "Please run make to create executable"
+    exit 1
 fi
 
 if test $# -ne 3; then
@@ -30,10 +31,10 @@ fi
 
 for input in $inputdir/*
 do
-    inputfile=$(echo $input | cut -d / -f2)
+    inputfile=$(echo $input | rev | cut -d / -f1 | rev)
     for i in $(seq 1 $maxthreads)
     do
-        echo Inputfile=$input NumThreads=$i
-        ./tecnicofs $input $outputdir/$inputfile-$i.txt $i | tail -1
+        echo Inputfile=$inputfile NumThreads=$i
+        ./tecnicofs $input $outputdir/$(echo $inputfile | cut -d . -f1)-$i.txt $i | tail -1
     done
 done

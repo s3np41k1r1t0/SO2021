@@ -375,9 +375,11 @@ int main(int argc, char ** argv){
     //verifica o parametro do numero de threads
     check_numberThreads(argv[3]);
 
-    //verifica se o utilizador tem permissoes para abrir o ficheiro e se ele existe
+    //verifica se o utilizador tem permissoes para abrir os ficheiros e se ele existem
     inputfile = fopen(argv[1],"r"); 
     check_file_open(inputfile, argv[1]);
+    outputfile = fopen(argv[2],"w");
+    check_file_open(outputfile, argv[2]);
     
     //le todos os comandos a partir do inputfile e fecha-o
     processInput(inputfile);
@@ -386,9 +388,7 @@ int main(int argc, char ** argv){
     //corre as operacoes do filesystem
     applyCommands();
 
-    //abre o outputfile, escreve o output e fecha o ficheiro
-    outputfile = fopen(argv[2],"w");
-    check_file_open(outputfile, argv[2]);
+    //escreve o output e fecha o ficheiro
     print_tecnicofs_tree(outputfile);
     close_file(outputfile, argv[2]);
     
