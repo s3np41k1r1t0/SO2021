@@ -12,6 +12,9 @@ LDFLAGS=-lm
 
 build: tecnicofs
 
+build-pipeline: tecnicofs
+	mkdir outputs
+
 tecnicofs: fs/state.o fs/operations.o main.o
 	$(LD) $(CFLAGS) $(LDFLAGS) -o tecnicofs fs/state.o fs/operations.o main.o
 	rm -f fs/*.o *.o *.out *.last
@@ -27,7 +30,7 @@ main.o: main.c fs/operations.h fs/state.h tecnicofs-api-constants.h
 
 clean:
 	@echo Cleaning...
-	rm -f fs/*.o *.o *.out *.last tecnicofs
+	rm -rf fs/*.o *.o *.out *.last tecnicofs outputs
 
 %.txt: outputs/%.stdin
 	./tecnicofs inputs/$@ output.out 1 nosync > stdin.last
