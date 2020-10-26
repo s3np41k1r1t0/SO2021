@@ -16,7 +16,7 @@ if test $# -ne 3; then
 fi
 
 if test ! -d $inputdir; then
-   echo "Make sure your input directory exists"
+   echo "Make sure the input directory exists"
    exit 1
 fi
 
@@ -26,7 +26,8 @@ if test $maxthreads -lt 1; then
 fi
 
 if test ! -d $outputdir; then
-    mkdir $outputdir
+    echo "Make sure the output directory exists"
+    exit 1
 fi
 
 for input in $inputdir/*
