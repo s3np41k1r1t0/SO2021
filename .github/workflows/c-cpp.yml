@@ -13,9 +13,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: make build
-      run: make build
-    - name: make test
-      run: make test
+    - name: build
+      run: make build-pipeline
+    - name: test
+      run: ./runTests.sh inputs outputs 4
     - name: make clean
       run: make clean
