@@ -30,15 +30,6 @@ int headQueue = 0;
 //mutex para proteger os comandos de input
 pthread_mutex_t mutex_comandos;
 
-//variavel que controla qual o sistema de trinco a usar
-//caso a variavel nao corresponda a MUTEX ou RWLOCK as funcoes 
-//correspondentes aos trincos nao fazem nada
-char mode;
-
-//trincos que protegem o filesystem
-pthread_mutex_t mutex;
-pthread_rwlock_t rwlock;
-
 //inicializa o mutex dos comandos
 void command_mutex_init(){
     if(pthread_mutex_init(&mutex_comandos, NULL) != 0){
@@ -68,106 +59,6 @@ void command_unlock(){
     if(pthread_mutex_unlock(&mutex_comandos) != 0){
         fprintf(stderr,"Error unlocking mutex\n");
         exit(EXIT_FAILURE);
-    }
-}
-
-//inicializa o trinco escolhido
-void init_locks(){
-    switch(mode){
-        case(MUTEX_C):
-            if(pthread_mutex_init(&mutex, NULL) != 0){
-                fprintf(stderr,"Error initializing mutex\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        case(RWLOCK_C):
-            if(pthread_rwlock_init(&rwlock, NULL) != 0){
-                fprintf(stderr,"Error initializing rwlock\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        default:
-            break;
-    }
-}
-
-//destroi o trinco escolhido
-void destroy_locks(){
-    switch(mode){
-        case(MUTEX_C):
-            if(pthread_mutex_destroy(&mutex) != 0){
-                fprintf(stderr,"Error destroying mutex\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        case(RWLOCK_C):
-            if(pthread_rwlock_destroy(&rwlock) != 0){
-                fprintf(stderr,"Error destroying rwlock\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        default:
-            break;
-    }
-}
-
-//bloqueia a leitura com o trinco escolhido
-void lock_read(){
-    switch(mode){
-        case(MUTEX_C):
-            if(pthread_mutex_lock(&mutex) != 0){
-                fprintf(stderr,"Error locking mutex\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        case(RWLOCK_C):
-            if(pthread_rwlock_rdlock(&rwlock) != 0){
-                fprintf(stderr,"Error locking rwlock\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        default:
-            break;
-    }
-}
-
-//bloqueia a escrita com o trinco escolhido
-void lock_write(){
-    switch(mode){
-        case(MUTEX_C):
-            if(pthread_mutex_lock(&mutex) != 0){
-                fprintf(stderr,"Error locking mutex\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        case(RWLOCK_C):
-            if(pthread_rwlock_wrlock(&rwlock) != 0){
-                fprintf(stderr,"Error locking rwlock\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        default:
-            break;
-    }
-}
-
-//desbloqueia a leitura/escrita com o trinco escolhido
-void unlock(){
-    switch(mode){
-        case(MUTEX_C):
-            if(pthread_mutex_unlock(&mutex) != 0){
-                fprintf(stderr,"Error unlocking mutex\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        case(RWLOCK_C):
-            if(pthread_rwlock_unlock(&rwlock) != 0){
-                fprintf(stderr,"Error unlocking rwlock\n");
-                exit(EXIT_FAILURE);
-            }
-            break;
-        default:
-            break;
     }
 }
 
@@ -244,10 +135,12 @@ void applyCommand(){
         command_lock();
         const char* command = removeCommand();
         command_unlock();
-        
+
         if (command == NULL){
             return;
         }
+
+        puts(command);
 
         char token, type;
         char name[MAX_INPUT_SIZE];
@@ -262,12 +155,10 @@ void applyCommand(){
             case 'c':
                 switch (type) {
                     case 'f':
-                        lock_write();
                         printf("Create file: %s\n", name);
                         create(name, T_FILE);
                         break;
                     case 'd':
-                        lock_write();
                         printf("Create directory: %s\n", name);
                         create(name, T_DIRECTORY);
                         break;
@@ -275,22 +166,17 @@ void applyCommand(){
                         fprintf(stderr, "Error: invalid node type\n");
                         exit(EXIT_FAILURE);
                 }
-                unlock();
                 break;
             case 'l': 
-                lock_read(); 
                 searchResult = lookup(name);
                 if (searchResult >= 0)
                     printf("Search: %s found\n", name);
                 else
                     printf("Search: %s not found\n", name);
-                unlock();
                 break;
             case 'd':
-                lock_write();
                 printf("Delete: %s\n", name);
                 delete(name);
-                unlock();
                 break;
             default: { /* error */
                 fprintf(stderr, "Error: command to apply\n");
@@ -366,10 +252,8 @@ int main(int argc, char ** argv){
     get_time(&start_time);    
 
     //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
-    mode = 'r';
     init_fs();
     
-    init_locks();
     command_mutex_init();
     
     //verifica o parametro do numero de threads
@@ -395,7 +279,6 @@ int main(int argc, char ** argv){
     //destroi o filesystem e os mutex/rwlocks
     destroy_fs();
     command_mutex_destroy();
-    destroy_locks();
 
     //calcula a diferenca de tempo e apresenta o benchmark
     get_time(&end_time);   

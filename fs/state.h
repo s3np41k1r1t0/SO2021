@@ -41,8 +41,14 @@ typedef struct inode_t {
 	type nodeType;
 	union Data data;
     /* more i-node attributes will be added in future exercises */
+    pthread_rwlock_t lock;
 } inode_t;
 
+void init(pthread_rwlock_t * rwlock);
+void destroy(pthread_rwlock_t * rwlock);
+void lock_read(int inumber);
+void lock_write(int inumber);
+void unlock(int inumber);
 
 void insert_delay(int cycles);
 void inode_table_init();
@@ -54,6 +60,5 @@ int inode_set_file(int inumber, char *fileContents, int len);
 int dir_reset_entry(int inumber, int sub_inumber);
 int dir_add_entry(int inumber, int sub_inumber, char *sub_name);
 void inode_print_tree(FILE *fp, int inumber, char *name);
-
 
 #endif /* INODES_H */

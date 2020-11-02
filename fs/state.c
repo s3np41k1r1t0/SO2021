@@ -8,6 +8,63 @@
 
 inode_t inode_table[INODE_TABLE_SIZE];
 
+pthread_rwlock_t rwlock;
+
+//inicializa o trinco escolhido
+void init(pthread_rwlock_t * rwlock){
+    if(pthread_rwlock_init(rwlock, NULL) != 0){
+        fprintf(stderr,"Error initializing rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//destroi o trinco escolhido
+void destroy(pthread_rwlock_t * rwlock){
+    if(pthread_rwlock_destroy(rwlock) != 0){
+        fprintf(stderr,"Error destroying rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//bloqueia a leitura com o trinco escolhido
+void lock_read(int inumber){
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE)) {
+        fprintf(stderr,"Error locking rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(pthread_rwlock_rdlock(&inode_table[inumber].lock) != 0){
+        fprintf(stderr,"Error locking rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//bloqueia a escrita com o trinco escolhido
+void lock_write(int inumber){
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE)) {
+        fprintf(stderr,"Error locking rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(pthread_rwlock_wrlock(&inode_table[inumber].lock) != 0){
+        fprintf(stderr,"Error locking rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//desbloqueia a leitura/escrita com o trinco escolhido
+void unlock(int inumber){
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE)) {
+        fprintf(stderr,"Error locking rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(pthread_rwlock_unlock(&inode_table[inumber].lock) != 0){
+        fprintf(stderr,"Error unlocking rwlock\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 /*
  * Sleeps for synchronization testing.
  */
@@ -23,6 +80,7 @@ void inode_table_init() {
         inode_table[i].nodeType = T_NONE;
         inode_table[i].data.dirEntries = NULL;
         inode_table[i].data.fileContents = NULL;
+        init(&inode_table[i].lock);
     }
 }
 
@@ -35,8 +93,10 @@ void inode_table_destroy() {
         if (inode_table[i].nodeType != T_NONE) {
             /* as data is an union, the same pointer is used for both dirEntries and fileContents */
             /* just release one of them */
-	  if (inode_table[i].data.dirEntries)
-            free(inode_table[i].data.dirEntries);
+            if (inode_table[i].data.dirEntries)
+                free(inode_table[i].data.dirEntries);
+
+            destroy(&inode_table[i].lock);
         }
     }
 }
@@ -54,7 +114,10 @@ int inode_create(type nType) {
     insert_delay(DELAY);
     
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
+        //TODO tirar este write daqui
+        lock_write(inumber);
         if (inode_table[inumber].nodeType == T_NONE) {
+
             inode_table[inumber].nodeType = nType;
 
             if (nType == T_DIRECTORY) {
@@ -69,9 +132,12 @@ int inode_create(type nType) {
                 inode_table[inumber].data.fileContents = NULL;
             }
 
+            unlock(inumber);
             return inumber;
         }
+        unlock(inumber);
     }
+    
     return FAIL;
 }
 
@@ -88,7 +154,7 @@ int inode_delete(int inumber) {
     if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
         printf("inode_delete: invalid inumber\n");
         return FAIL;
-    } 
+    }
 
     inode_table[inumber].nodeType = T_NONE;
 
@@ -138,7 +204,7 @@ int inode_get(int inumber, type *nType, union Data *data) {
 int dir_reset_entry(int inumber, int sub_inumber) {
     /* Used for testing synchronization speedup */
     insert_delay(DELAY);
-    
+
     if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
         printf("inode_reset_entry: invalid inumber\n");
         return FAIL;
