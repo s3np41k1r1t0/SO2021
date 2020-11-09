@@ -195,6 +195,7 @@ int delete(char *name){
     lock_read(parent_inumber);
 	inode_get(parent_inumber, &pType, &pdata);
 
+	//TODO Se der bosta nos ifs nao ficamos com dead locks?
 	if(pType != T_DIRECTORY) {
 		printf("failed to delete %s, parent %s is not a dir\n",
 		        child_name, parent_name);

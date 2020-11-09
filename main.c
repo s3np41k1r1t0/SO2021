@@ -15,12 +15,6 @@
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
 
-#define NOSYNC "nosync"
-#define MUTEX "mutex"
-#define RWLOCK "rwlock"
-#define MUTEX_C 'm'
-#define RWLOCK_C 'r'
-
 int numberThreads = 0;
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
