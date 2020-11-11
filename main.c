@@ -57,31 +57,6 @@ void command_unlock(){
 }
 
 int insertCommand(char* data) {
-<<<<<<< HEAD
-    command_lock();
-    while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
-    strcpy(inputCommands[numberCommands++], data);
-    pthread_cond_signal(&canRemove);
-    command_unlock();
-    return 1;
-    /*
-    if(numberCommands != MAX_COMMANDS) {
-        strcpy(inputCommands[numberCommands++], data);
-        return 1;
-    }
-    return 0;
-    */
-}
-
-char* removeCommand() {
-    command_lock();
-    while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
-    numberCommands--;
-    pthread_cond_signal(&canInsert);
-    command_unlock();
-<<<<<<< HEAD
-    return returnValue;
-=======
     if(numberCommands != MAX_COMMANDS) {
         strcpy(inputCommands[numberCommands++], data);
         return 1;
@@ -90,21 +65,11 @@ char* removeCommand() {
 }
 
 char* removeCommand() {
-=======
-    return inputCommands[headQueue++];
-
-    /*
->>>>>>> parent of f6d0cae... fixed some stuff broke others lol
     if(numberCommands > 0){
         numberCommands--;
         return inputCommands[headQueue++];  
     }
     return NULL;
-<<<<<<< HEAD
->>>>>>> parent of 4c6f5e6... sofrimento
-=======
-    */
->>>>>>> parent of f6d0cae... fixed some stuff broke others lol
 }
 
 void errorParse(){
@@ -267,6 +232,7 @@ void get_time(struct timeval *time){
     }
 }
 
+//NEEDED TO REVERT THIS LOL
 int main(int argc, char ** argv){
     struct timeval start_time, end_time;
     double delta;
