@@ -11,15 +11,17 @@
 #include <sys/time.h>
 #include "fs/operations.h"
 #include <pthread.h>
+#include <assert.h>
 
 #define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
 
-int numberThreads = 0;
+int numberThreads = 0, indexInsert = 0, indexRemove = 0;
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
 int headQueue = 0;
+int done = 0;
 
 //mutex para proteger os comandos de input
 pthread_mutex_t mutex_comandos;
@@ -99,34 +101,26 @@ void cond_destroy(){
 int insertCommand(char* data) {
     command_lock();
     while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
-    strcpy(inputCommands[numberCommands++], data);
+    strcpy(inputCommands[indexInsert%MAX_COMMANDS], data);
+    indexInsert++;
+    numberCommands++;
     pthread_cond_signal(&canRemove);
     command_unlock();
     return 1;
-    /*
-    if(numberCommands != MAX_COMMANDS) {
-        strcpy(inputCommands[numberCommands++], data);
-        return 1;
-    }
-    return 0;
-    */
 }
 
 char* removeCommand() {
+    char * returnValue;
     command_lock();
+    if(done) {command_unlock(); return NULL;}
     while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
+    if(done) {command_unlock(); return NULL;}
+    returnValue = inputCommands[indexRemove%MAX_COMMANDS];
+    indexRemove++;
     numberCommands--;
     pthread_cond_signal(&canInsert);
     command_unlock();
-    return inputCommands[headQueue++];
-
-    /*
-    if(numberCommands > 0){
-        numberCommands--;
-        return inputCommands[headQueue++];  
-    }
-    return NULL;
-    */
+    return returnValue;
 }
 
 void errorParse(){
@@ -178,6 +172,8 @@ void processInput(FILE *input){
             }
         }
     }
+    done = 1;
+    pthread_cond_signal(&canRemove);
 }
 
 void applyCommand(){
