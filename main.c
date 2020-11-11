@@ -13,7 +13,7 @@
 #include <pthread.h>
 #include <assert.h>
 
-#define MAX_COMMANDS 10
+#define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
 
 int numberThreads = 0, indexInsert = 0, indexRemove = 0;
@@ -25,8 +25,6 @@ int done = 0;
 
 //mutex para proteger os comandos de input
 pthread_mutex_t mutex_comandos;
-
-pthread_cond_t canInsert, canRemove;
 
 //inicializa o mutex dos comandos
 void command_mutex_init(){
@@ -60,45 +58,8 @@ void command_unlock(){
     }
 }
 
-void cond_insert_init(){
-    if(pthread_cond_init(&canInsert, NULL) != 0){
-        fprintf(stderr, "Error initializing insert condition\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void cond_remove_init(){
-    if(pthread_cond_init(&canRemove, NULL) != 0){
-        fprintf(stderr, "Error initializing remove condition\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void cond_insert_destroy(){
-    if(pthread_cond_destroy(&canInsert) != 0){
-        fprintf(stderr, "Error destroying insert condition\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void cond_remove_destroy(){
-    if(pthread_cond_destroy(&canRemove) != 0){
-        fprintf(stderr, "Error destroying remove condition\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void cond_init(){
-    cond_insert_init();
-    cond_remove_init();
-}
-
-void cond_destroy(){
-    cond_insert_destroy();
-    cond_remove_destroy();
-}
-
 int insertCommand(char* data) {
+<<<<<<< HEAD
     command_lock();
     while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
     strcpy(inputCommands[indexInsert%MAX_COMMANDS], data);
@@ -121,6 +82,21 @@ char* removeCommand() {
     pthread_cond_signal(&canInsert);
     command_unlock();
     return returnValue;
+=======
+    if(numberCommands != MAX_COMMANDS) {
+        strcpy(inputCommands[numberCommands++], data);
+        return 1;
+    }
+    return 0;
+}
+
+char* removeCommand() {
+    if(numberCommands > 0){
+        numberCommands--;
+        return inputCommands[headQueue++];  
+    }
+    return NULL;
+>>>>>>> parent of 4c6f5e6... sofrimento
 }
 
 void errorParse(){
@@ -179,16 +155,15 @@ void processInput(FILE *input){
 void applyCommand(){
     while (1){
         //protege a var global numberCommands e a queue de comandos
-        //command_lock();
+        command_lock();
         const char* command = removeCommand();
-        //command_unlock();
+        command_unlock();
 
         if (command == NULL){
             return;
         }
 
-        //TODO isto devia estar aqui?
-        //puts(command);
+        puts(command);
 
         char token, type;
         char name[MAX_INPUT_SIZE];
@@ -290,8 +265,6 @@ int main(int argc, char ** argv){
     struct timeval start_time, end_time;
     double delta;
     FILE *inputfile, *outputfile;
-
-    pthread_t tid[2];
    
     //verifica o numero de argumentos
     if(argc != 4){
@@ -301,14 +274,10 @@ int main(int argc, char ** argv){
 
     get_time(&start_time);    
 
-    //inicia o filesystem
+    //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
     init_fs();
     
-    //inicializa o mutex dos comandos
     command_mutex_init();
-
-    //inicializa as condicoes de espera
-    cond_init();
     
     //verifica o parametro do numero de threads
     check_numberThreads(argv[3]);
@@ -319,38 +288,20 @@ int main(int argc, char ** argv){
     outputfile = fopen(argv[2],"w");
     check_file_open(outputfile, argv[2]);
     
-    //le todos os comandos a partir do inputfile
-    if(pthread_create(&(tid[0]),NULL,(void *) &processInput,inputfile) != 0){
-        fprintf(stderr,"Error creating thread\n");
-        exit(EXIT_FAILURE);
-    }
+    //le todos os comandos a partir do inputfile e fecha-o
+    processInput(inputfile);
+    close_file(inputfile, argv[1]);
 
     //corre as operacoes do filesystem
-    if(pthread_create(&(tid[1]),NULL,(void *) &applyCommands,NULL) != 0){
-        fprintf(stderr,"Error creating thread\n");
-        exit(EXIT_FAILURE);
-    }
-
-    for(int i = 0; i < 2; i++){
-        if(pthread_join(tid[i],NULL) != 0){
-            fprintf(stderr,"Error joining thread\n");
-            exit(EXIT_FAILURE);
-        }
-    }
-    
-    //fecha o inputfile
-    close_file(inputfile, argv[1]);
+    applyCommands();
 
     //escreve o output e fecha o ficheiro
     print_tecnicofs_tree(outputfile);
     close_file(outputfile, argv[2]);
     
-    //destroi o filesystem e os mutex
+    //destroi o filesystem e os mutex/rwlocks
     destroy_fs();
     command_mutex_destroy();
-
-    //destroi as condicoes de espera
-    cond_destroy();
 
     //calcula a diferenca de tempo e apresenta o benchmark
     get_time(&end_time);   
