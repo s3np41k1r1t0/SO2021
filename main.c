@@ -11,17 +11,15 @@
 #include <sys/time.h>
 #include "fs/operations.h"
 #include <pthread.h>
-#include <assert.h>
 
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
 
-int numberThreads = 0, indexInsert = 0, indexRemove = 0;
+int numberThreads = 0;
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
 int headQueue = 0;
-int done = 0;
 
 //mutex para proteger os comandos de input
 pthread_mutex_t mutex_comandos;
@@ -62,25 +60,26 @@ int insertCommand(char* data) {
 <<<<<<< HEAD
     command_lock();
     while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
-    strcpy(inputCommands[indexInsert%MAX_COMMANDS], data);
-    indexInsert++;
-    numberCommands++;
+    strcpy(inputCommands[numberCommands++], data);
     pthread_cond_signal(&canRemove);
     command_unlock();
     return 1;
+    /*
+    if(numberCommands != MAX_COMMANDS) {
+        strcpy(inputCommands[numberCommands++], data);
+        return 1;
+    }
+    return 0;
+    */
 }
 
 char* removeCommand() {
-    char * returnValue;
     command_lock();
-    if(done) {command_unlock(); return NULL;}
     while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
-    if(done) {command_unlock(); return NULL;}
-    returnValue = inputCommands[indexRemove%MAX_COMMANDS];
-    indexRemove++;
     numberCommands--;
     pthread_cond_signal(&canInsert);
     command_unlock();
+<<<<<<< HEAD
     return returnValue;
 =======
     if(numberCommands != MAX_COMMANDS) {
@@ -91,12 +90,21 @@ char* removeCommand() {
 }
 
 char* removeCommand() {
+=======
+    return inputCommands[headQueue++];
+
+    /*
+>>>>>>> parent of f6d0cae... fixed some stuff broke others lol
     if(numberCommands > 0){
         numberCommands--;
         return inputCommands[headQueue++];  
     }
     return NULL;
+<<<<<<< HEAD
 >>>>>>> parent of 4c6f5e6... sofrimento
+=======
+    */
+>>>>>>> parent of f6d0cae... fixed some stuff broke others lol
 }
 
 void errorParse(){
@@ -148,8 +156,6 @@ void processInput(FILE *input){
             }
         }
     }
-    done = 1;
-    pthread_cond_signal(&canRemove);
 }
 
 void applyCommand(){
