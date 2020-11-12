@@ -31,6 +31,15 @@ void lock_write(int i){
     }
 }
 
+int try_lock_write(int i){
+    if(i < 0 || i > INODE_TABLE_SIZE){
+        fprintf(stderr,"Invalid inode number found. Exiting...\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return pthread_rwlock_trywrlock(&(inode_table[i].lock));
+}
+
 void unlock(int i){
     if(i < 0 || i > INODE_TABLE_SIZE){
         fprintf(stderr,"Invalid inode number found. Exiting...\n");
@@ -99,7 +108,7 @@ int inode_create(type nType) {
     insert_delay(DELAY);
     
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
-        lock_write(inumber);
+        if(try_lock_write(inumber) != 0) continue;
         if (inode_table[inumber].nodeType == T_NONE) {
             inode_table[inumber].nodeType = nType;
 

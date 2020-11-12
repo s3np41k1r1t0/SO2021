@@ -11,7 +11,6 @@
  *  - child: reference to a char*, to store child file name
  */
 void split_parent_child_from_path(char * path, char ** parent, char ** child) {
-
 	int n_slashes = 0, last_slash_location = 0;
 	int len = strlen(path);
 
@@ -128,6 +127,7 @@ int create(char *name, type nodeType){
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
 		        name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
@@ -136,29 +136,35 @@ int create(char *name, type nodeType){
 	if(pType != T_DIRECTORY) {
 		printf("failed to create %s, parent %s is not a dir\n",
 		        name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
 	if (lookup_sub_node(child_name, pdata.dirEntries) != FAIL) {
 		printf("failed to create %s, already exists in dir %s\n",
 		       child_name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
 	/* create node and add entry to folder that contains new node */
 	child_inumber = inode_create(nodeType);
+	
 	if (child_inumber == FAIL) {
 		printf("failed to create %s in  %s, couldn't allocate inode\n",
 		        child_name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
 	if (dir_add_entry(parent_inumber, child_inumber, child_name) == FAIL) {
 		printf("could not add entry %s in dir %s\n",
 		       child_name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
-
+	
+	undo_lookup(parent_name);
 	return SUCCESS;
 }
 
@@ -185,6 +191,7 @@ int delete(char *name){
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
 		        child_name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
@@ -193,6 +200,7 @@ int delete(char *name){
 	if(pType != T_DIRECTORY) {
 		printf("failed to delete %s, parent %s is not a dir\n",
 		        child_name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
@@ -201,14 +209,16 @@ int delete(char *name){
 	if (child_inumber == FAIL) {
 		printf("could not delete %s, does not exist in dir %s\n",
 		       name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
 	inode_get(child_inumber, &cType, &cdata);
-	
+
 	if (cType == T_DIRECTORY && is_dir_empty(cdata.dirEntries) == FAIL) {
 		printf("could not delete %s: is a directory and not empty\n",
 		       name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
@@ -216,15 +226,19 @@ int delete(char *name){
 	if (dir_reset_entry(parent_inumber, child_inumber) == FAIL) {
 		printf("failed to delete %s from dir %s\n",
 		       child_name, parent_name);
+		undo_lookup(parent_name);
 		return FAIL;
 	}
 
 	if (inode_delete(child_inumber) == FAIL) {
 		printf("could not delete inode number %d from dir %s\n",
 		       child_inumber, parent_name);
+		undo_lookup(parent_name);
+		
 		return FAIL;
 	}
 
+	undo_lookup(parent_name);
 	return SUCCESS;
 }
 
@@ -249,14 +263,17 @@ int lookup(char *name) {
 	/* use for copy */
 	type nType;
 	union Data data;
-
+	
 	/* get root inode data */
+	//locks all nodes in path
+	lock_read(current_inumber);
 	inode_get(current_inumber, &nType, &data);
 
 	char *path = strtok(full_path, delim);
 
 	/* search for all sub nodes */
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+		lock_read(current_inumber);
 		inode_get(current_inumber, &nType, &data);
 		path = strtok(NULL, delim);
 	}
@@ -264,6 +281,32 @@ int lookup(char *name) {
 	return current_inumber;
 }
 
+void undo_lookup(char *name) {
+	char full_path[MAX_FILE_NAME];
+	char delim[] = "/";
+
+	strcpy(full_path, name);
+
+	/* start at root node */
+	int current_inumber = FS_ROOT;
+
+	/* use for copy */
+	type nType;
+	union Data data;
+	
+	/* get root inode data */
+	inode_get(current_inumber, &nType, &data);
+	unlock(current_inumber);
+
+	char *path = strtok(full_path, delim);
+
+	/* search for all sub nodes */
+	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+		inode_get(current_inumber, &nType, &data);
+		unlock(current_inumber);
+		path = strtok(NULL, delim);
+	}
+}
 
 /*
  * Prints tecnicofs tree.

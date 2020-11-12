@@ -134,6 +134,8 @@ void applyCommand(){
             return;
         }
 
+	    printf("%s\n",command);
+
         char token, type;
         char name[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
@@ -161,6 +163,7 @@ void applyCommand(){
                 break;
             case 'l': 
                 searchResult = lookup(name);
+                undo_lookup(name);
                 if (searchResult >= 0)
                     printf("Search: %s found\n", name);
                 else
