@@ -124,7 +124,7 @@ int inode_create(type nType) {
                 inode_table[inumber].data.fileContents = NULL;
             }
 
-            unlock(inumber);
+            //does not lock the node just yet
             return inumber;
         }
         unlock(inumber);

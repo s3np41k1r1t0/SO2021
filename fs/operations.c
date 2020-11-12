@@ -52,6 +52,8 @@ void init_fs() {
 		printf("failed to create node for tecnicofs root\n");
 		exit(EXIT_FAILURE);
 	}
+
+	unlock(root);
 }
 
 
@@ -149,6 +151,7 @@ int create(char *name, type nodeType){
 
 	/* create node and add entry to folder that contains new node */
 	child_inumber = inode_create(nodeType);
+	//inode create already locks the child
 	
 	if (child_inumber == FAIL) {
 		printf("failed to create %s in  %s, couldn't allocate inode\n",
@@ -161,9 +164,11 @@ int create(char *name, type nodeType){
 		printf("could not add entry %s in dir %s\n",
 		       child_name, parent_name);
 		undo_lookup(parent_name);
+		unlock(child_inumber);
 		return FAIL;
 	}
-	
+
+	unlock(child_inumber);
 	undo_lookup(parent_name);
 	return SUCCESS;
 }
@@ -212,6 +217,8 @@ int delete(char *name){
 		undo_lookup(parent_name);
 		return FAIL;
 	}
+	
+	lock_write(child_inumber);
 
 	inode_get(child_inumber, &cType, &cdata);
 
@@ -219,6 +226,7 @@ int delete(char *name){
 		printf("could not delete %s: is a directory and not empty\n",
 		       name);
 		undo_lookup(parent_name);
+		unlock(child_inumber);
 		return FAIL;
 	}
 
@@ -226,6 +234,7 @@ int delete(char *name){
 	if (dir_reset_entry(parent_inumber, child_inumber) == FAIL) {
 		printf("failed to delete %s from dir %s\n",
 		       child_name, parent_name);
+		unlock(child_inumber);
 		undo_lookup(parent_name);
 		return FAIL;
 	}
@@ -233,11 +242,12 @@ int delete(char *name){
 	if (inode_delete(child_inumber) == FAIL) {
 		printf("could not delete inode number %d from dir %s\n",
 		       child_inumber, parent_name);
+		unlock(child_inumber);
 		undo_lookup(parent_name);
-		
 		return FAIL;
 	}
-
+	
+	unlock(child_inumber);
 	undo_lookup(parent_name);
 	return SUCCESS;
 }
@@ -273,6 +283,7 @@ int lookup(char *name) {
 
 	/* search for all sub nodes */
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+		//TODO: change last read lock to a write lock
 		lock_read(current_inumber);
 		inode_get(current_inumber, &nType, &data);
 		path = strtok(NULL, delim);
