@@ -2,11 +2,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <pthread.h>
 #include "state.h"
 #include "../tecnicofs-api-constants.h"
 
 inode_t inode_table[INODE_TABLE_SIZE];
+
+void lock_read(int i){
+    if(i < 0 || i > INODE_TABLE_SIZE){
+        fprintf(stderr,"Invalid inode number found. Exiting...\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(pthread_rwlock_rdlock(&(inode_table[i].lock)) != 0){
+        fprintf(stderr,"Error locking lock\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void lock_write(int i){
+    if(i < 0 || i > INODE_TABLE_SIZE){
+        fprintf(stderr,"Invalid inode number found. Exiting...\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(pthread_rwlock_wrlock(&(inode_table[i].lock)) != 0){
+        fprintf(stderr,"Error locking lock\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void unlock(int i){
+    if(i < 0 || i > INODE_TABLE_SIZE){
+        fprintf(stderr,"Invalid inode number found. Exiting...\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(pthread_rwlock_unlock(&(inode_table[i].lock)) != 0){
+        fprintf(stderr,"Error locking lock\n");
+        exit(EXIT_FAILURE);
+    }
+}
 
 /*
  * Sleeps for synchronization testing.
@@ -23,6 +58,11 @@ void inode_table_init() {
         inode_table[i].nodeType = T_NONE;
         inode_table[i].data.dirEntries = NULL;
         inode_table[i].data.fileContents = NULL;
+
+        if(pthread_rwlock_init(&(inode_table[i].lock), NULL) != 0){
+            fprintf(stderr,"Error initializing lock\n");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -35,8 +75,13 @@ void inode_table_destroy() {
         if (inode_table[i].nodeType != T_NONE) {
             /* as data is an union, the same pointer is used for both dirEntries and fileContents */
             /* just release one of them */
-	  if (inode_table[i].data.dirEntries)
+	    if (inode_table[i].data.dirEntries)
             free(inode_table[i].data.dirEntries);
+        }
+
+        if(pthread_rwlock_destroy(&(inode_table[i].lock)) != 0){
+            fprintf(stderr,"Error destroying lock\n");
+            exit(EXIT_FAILURE);
         }
     }
 }
@@ -54,6 +99,7 @@ int inode_create(type nType) {
     insert_delay(DELAY);
     
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
+        lock_write(inumber);
         if (inode_table[inumber].nodeType == T_NONE) {
             inode_table[inumber].nodeType = nType;
 
@@ -69,8 +115,10 @@ int inode_create(type nType) {
                 inode_table[inumber].data.fileContents = NULL;
             }
 
+            unlock(inumber);
             return inumber;
         }
+        unlock(inumber);
     }
     return FAIL;
 }
