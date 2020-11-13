@@ -270,10 +270,8 @@ int move(char *name, char *destination){
 	type pType, nType;
 	union Data pdata, ndata;
 
-	int locks_src[INODE_TABLE_SIZE] = {0};
-	int locks_src_size = 0;
-	int locks_dst[INODE_TABLE_SIZE] = {0};
-	int locks_dst_size = 0;
+	int locks[INODE_TABLE_SIZE] = {0};
+	int locks_size = 0;
 	
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
@@ -282,8 +280,7 @@ int move(char *name, char *destination){
 	split_parent_child_from_path(dest_name_copy, &dest_parent_name, &dest_child_name);
 	//                             z                   root                z          
 
-	parent_inumber = lookup(parent_name,WRITE,locks_src,&locks_src_size);
-	puts("SRC");
+	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 	//							a
 
 	inode_get(parent_inumber, &pType, &pdata);
@@ -293,14 +290,13 @@ int move(char *name, char *destination){
 
 	if ((parent_inumber == FAIL) || (child_inumber == FAIL)){
 		printf("could not move: file/directory %s doesn't exist\n", name);
-		undo_locks(locks_src,locks_src_size);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
 	lock_read(child_inumber);
 
-	dest_parent_inumber = lookup_dst(dest_parent_name,WRITE,locks_dst,&locks_dst_size,locks_src,locks_src_size);
-	puts("DST");
+	dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
 
 	//									root
 	inode_get(dest_parent_inumber, &nType, &ndata);
@@ -308,16 +304,14 @@ int move(char *name, char *destination){
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
 		unlock(child_inumber);
-		undo_locks(locks_src,locks_src_size);
-		undo_locks(locks_dst,locks_dst_size);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	} 
 
 	if (lookup_sub_node(child_name, ndata.dirEntries) != FAIL){
 		printf("could not move: file/directory %s already exists\n", name);
 		unlock(child_inumber);
-		undo_locks(locks_src,locks_src_size);
-		undo_locks(locks_dst,locks_dst_size);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -325,8 +319,7 @@ int move(char *name, char *destination){
 		printf("could not move %s to dir %s\n",
 		       child_name, parent_name);
 		unlock(child_inumber);
-		undo_locks(locks_src,locks_src_size);
-		undo_locks(locks_dst,locks_dst_size);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -334,21 +327,34 @@ int move(char *name, char *destination){
 		printf("failed to move %s from dir %s\n",
 		       child_name, parent_name);
 		unlock(child_inumber);
-		undo_locks(locks_src,locks_src_size);
-		undo_locks(locks_dst,locks_dst_size);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
 	unlock(child_inumber);
-	undo_locks(locks_src,locks_src_size);
-	undo_locks(locks_dst,locks_dst_size);
+	undo_locks(locks,locks_size);
 	return SUCCESS;
 }
 
+// searches for a inumber in a array of inumbers
+// n time and 0 space is a not that bad algorithmical time and space complexity
+// given that the array of locks might not be sorted...
+int inLock(int inumber, int* locks, int size){
+	if(locks == NULL) return 0;
+
+	for(int i=0; i<size; i++)
+		if(locks[i] == inumber) return 0;
+
+	return 1;
+} 
+
 /*
- * Lookup for a given path.
+ * Lookup for a given path. Inserts all locked node number in locks.
  * Input:
  *  - name: path of node
+ *  - flag: enables WRITE mode
+ *  - locks: array of inumbers that are locked
+ *  - size: size of locks
  * Returns:
  *  inumber: identifier of the i-node, if found
  *     FAIL: otherwise
@@ -368,54 +374,10 @@ int lookup(char *name, char flag, int *locks, int * size) {
 	union Data data;
 	
 	char *path = strtok_r(full_path, delim, &saveptr);
-	
+
+	int il = inLock(current_inumber,locks,*size);
+
 	if(path == NULL && flag == WRITE) lock_write(current_inumber);
-	else lock_read(current_inumber);
-
-	locks[(*size)++] = current_inumber;
-	
-	/* get root inode data */
-	inode_get(current_inumber, &nType, &data);
-
-	/* search for all sub nodes */
-	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		path = strtok_r(NULL, delim, &saveptr);
-		if(path == NULL && flag == WRITE) lock_write(current_inumber);
-		else lock_read(current_inumber);
-		locks[(*size)++] = current_inumber;
-		inode_get(current_inumber, &nType, &data);
-	}
-
-	return current_inumber;
-}
-
-int inLock(int inumber, int*d, int ds){
-	for(int i=0; i<ds; i++)
-		if(d[i] == inumber) return 0;
-	return 1;
-} 
-
-//TODO REMOVE THIS SHIT LOL
-int lookup_dst(char *name, char flag, int *locks, int * size, int *d, int ds) {
-	char full_path[MAX_FILE_NAME];
-	char * saveptr;
-	char delim[] = "/";
-	int il;
-	
-	strcpy(full_path, name);
-
-	/* start at root node */
-	int current_inumber = FS_ROOT;
-
-	/* use for copy */
-	type nType;
-	union Data data;
-	
-	char *path = strtok_r(full_path, delim, &saveptr);
-	
-	il = inLock(current_inumber,d,ds);
-
-	if(path == NULL && flag == WRITE && il) lock_write(current_inumber);
 	else if(il) lock_read(current_inumber);
 
 	if(il) locks[(*size)++] = current_inumber;
@@ -426,8 +388,8 @@ int lookup_dst(char *name, char flag, int *locks, int * size, int *d, int ds) {
 	/* search for all sub nodes */
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
 		path = strtok_r(NULL, delim, &saveptr);
-		il = inLock(current_inumber,d,ds);
-		if(path == NULL && flag == WRITE && il) lock_write(current_inumber);
+		il = inLock(current_inumber,locks,*size);
+		if(path == NULL && flag == WRITE) lock_write(current_inumber);
 		else if(il) lock_read(current_inumber);
 		if(il) locks[(*size)++] = current_inumber;
 		inode_get(current_inumber, &nType, &data);
