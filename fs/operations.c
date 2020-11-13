@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#define WRITE 0
+#define READ  1
+
 /* Given a path, fills pointers with strings for the parent path and child
  * file name
  * Input:
@@ -121,15 +124,18 @@ int create(char *name, type nodeType){
 	type pType;
 	union Data pdata;
 
+	int locks[INODE_TABLE_SIZE] = {0};
+	int locks_size = 0;
+
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	parent_inumber = lookup(parent_name);
+	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 	
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
 		        name, parent_name);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -138,14 +144,14 @@ int create(char *name, type nodeType){
 	if(pType != T_DIRECTORY) {
 		printf("failed to create %s, parent %s is not a dir\n",
 		        name, parent_name);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
 	if (lookup_sub_node(child_name, pdata.dirEntries) != FAIL) {
 		printf("failed to create %s, already exists in dir %s\n",
 		       child_name, parent_name);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -156,20 +162,21 @@ int create(char *name, type nodeType){
 	if (child_inumber == FAIL) {
 		printf("failed to create %s in  %s, couldn't allocate inode\n",
 		        child_name, parent_name);
-		undo_lookup(parent_name);
+		unlock(child_inumber);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
 	if (dir_add_entry(parent_inumber, child_inumber, child_name) == FAIL) {
 		printf("could not add entry %s in dir %s\n",
 		       child_name, parent_name);
-		undo_lookup(parent_name);
 		unlock(child_inumber);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
 	unlock(child_inumber);
-	undo_lookup(parent_name);
+	undo_locks(locks,locks_size);
 	return SUCCESS;
 }
 
@@ -188,15 +195,18 @@ int delete(char *name){
 	type pType, cType;
 	union Data pdata, cdata;
 
+	int locks[INODE_TABLE_SIZE] = {0};
+	int locks_size = 0;
+
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	parent_inumber = lookup(parent_name);
+	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
 		        child_name, parent_name);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -205,7 +215,7 @@ int delete(char *name){
 	if(pType != T_DIRECTORY) {
 		printf("failed to delete %s, parent %s is not a dir\n",
 		        child_name, parent_name);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -214,7 +224,7 @@ int delete(char *name){
 	if (child_inumber == FAIL) {
 		printf("could not delete %s, does not exist in dir %s\n",
 		       name, parent_name);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 	
@@ -224,9 +234,9 @@ int delete(char *name){
 
 	if (cType == T_DIRECTORY && is_dir_empty(cdata.dirEntries) == FAIL) {
 		printf("could not delete %s: is a directory and not empty\n",
-		       name);
-		undo_lookup(parent_name);
+		       name);	
 		unlock(child_inumber);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -235,7 +245,7 @@ int delete(char *name){
 		printf("failed to delete %s from dir %s\n",
 		       child_name, parent_name);
 		unlock(child_inumber);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
@@ -243,15 +253,14 @@ int delete(char *name){
 		printf("could not delete inode number %d from dir %s\n",
 		       child_inumber, parent_name);
 		unlock(child_inumber);
-		undo_lookup(parent_name);
+		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 	
 	unlock(child_inumber);
-	undo_lookup(parent_name);
+	undo_locks(locks,locks_size);
 	return SUCCESS;
 }
-
 
 /*
  * Lookup for a given path.
@@ -261,10 +270,11 @@ int delete(char *name){
  *  inumber: identifier of the i-node, if found
  *     FAIL: otherwise
  */
-int lookup(char *name) {
+int lookup(char *name, char flag, int *locks, int * size) {
 	char full_path[MAX_FILE_NAME];
+	char * saveptr;
 	char delim[] = "/";
-
+	
 	strcpy(full_path, name);
 
 	/* start at root node */
@@ -274,48 +284,38 @@ int lookup(char *name) {
 	type nType;
 	union Data data;
 	
-	/* get root inode data */
-	//locks all nodes in path
-	lock_read(current_inumber);
-	inode_get(current_inumber, &nType, &data);
+	char *path = strtok_r(full_path, delim, &saveptr);
+	
+	if(path == NULL && flag == WRITE) lock_write(current_inumber);
+	else lock_read(current_inumber);
 
-	char *path = strtok(full_path, delim);
+	locks[(*size)++] = current_inumber;
+	
+	/* get root inode data */
+	inode_get(current_inumber, &nType, &data);
 
 	/* search for all sub nodes */
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		//TODO: change last read lock to a write lock
-		lock_read(current_inumber);
+		path = strtok_r(NULL, delim, &saveptr);
+		if(path == NULL && flag == WRITE) lock_write(current_inumber);
+		else lock_read(current_inumber);
+		locks[(*size)++] = current_inumber;
 		inode_get(current_inumber, &nType, &data);
-		path = strtok(NULL, delim);
 	}
 
 	return current_inumber;
 }
 
-void undo_lookup(char *name) {
-	char full_path[MAX_FILE_NAME];
-	char delim[] = "/";
+int lookup_read_handler(char *name){
+	int locks[INODE_TABLE_SIZE] = {0}, size = 0;
+	int search = lookup(name,READ,locks,&size);
+	undo_locks(locks,size);
+	return search;
+}
 
-	strcpy(full_path, name);
-
-	/* start at root node */
-	int current_inumber = FS_ROOT;
-
-	/* use for copy */
-	type nType;
-	union Data data;
-	
-	/* get root inode data */
-	inode_get(current_inumber, &nType, &data);
-	unlock(current_inumber);
-
-	char *path = strtok(full_path, delim);
-
-	/* search for all sub nodes */
-	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		inode_get(current_inumber, &nType, &data);
-		unlock(current_inumber);
-		path = strtok(NULL, delim);
+void undo_locks(int *locks, int size) {
+	for(int i=0; i<size; i++) {
+		unlock(locks[i]);
 	}
 }
 

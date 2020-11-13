@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "state.h"
+#include <errno.h>
 #include "../tecnicofs-api-constants.h"
 
 inode_t inode_table[INODE_TABLE_SIZE];
@@ -37,7 +38,14 @@ int try_lock_write(int i){
         exit(EXIT_FAILURE);
     }
 
-    return pthread_rwlock_trywrlock(&(inode_table[i].lock));
+    int ret = pthread_rwlock_trywrlock(&(inode_table[i].lock));
+
+    if(ret != EBUSY && ret != 0){
+        fprintf(stderr,"Fatal lock failure\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return ret;
 }
 
 void unlock(int i){
@@ -47,7 +55,7 @@ void unlock(int i){
     }
 
     if(pthread_rwlock_unlock(&(inode_table[i].lock)) != 0){
-        fprintf(stderr,"Error locking lock\n");
+        fprintf(stderr,"Error unlocking lock\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -108,7 +116,7 @@ int inode_create(type nType) {
     insert_delay(DELAY);
     
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
-        if(try_lock_write(inumber) != 0) continue;
+        if(try_lock_write(inumber) == EBUSY) continue;
         if (inode_table[inumber].nodeType == T_NONE) {
             inode_table[inumber].nodeType = nType;
 

@@ -51,4 +51,8 @@ test%: inputs/test%.txt
 	./tecnicofs $< output.out 3 mutex
 	read -n 1
 	./tecnicofs $< output.out 3 rwlock
-	
+
+debug: fs/state.o fs/operations.o main.o
+	$(LD) $(CFLAGS) $(LDFLAGS) -o debug fs/state.o fs/operations.o test.c
+	rm -f fs/*.o *.o *.out *.last
+	./debug

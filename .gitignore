@@ -54,3 +54,5 @@ dkms.conf
 tecnicofs
 .gdb_history
 *.last
+not.main
+outputs
