@@ -112,7 +112,14 @@ void processInput(FILE *input){
                 if(insertCommand(line))
                     break;
                 return;
-            
+
+            case 'm':
+                if(numTokens != 3)
+                    errorParse();
+                if(insertCommand(line))
+                    break;
+                return;
+
             case '#':
                 break;
             
@@ -136,7 +143,13 @@ void applyCommand(){
 
         char token, type;
         char name[MAX_INPUT_SIZE];
+        char destination[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
+
+        if (token == 'm'){
+            numTokens = sscanf(command, "%c %s %s", &token, name, destination);
+        }
+        
         if (numTokens < 2) {
             fprintf(stderr, "Error: invalid command in Queue\n");
             exit(EXIT_FAILURE);
@@ -169,6 +182,10 @@ void applyCommand(){
             case 'd':
                 printf("Delete: %s\n", name);
                 delete(name);
+                break;
+            case 'm':
+                printf("Move: %s\n", name);
+                move(name, destination);
                 break;
             default: { /* error */
                 fprintf(stderr, "Error: command to apply\n");
