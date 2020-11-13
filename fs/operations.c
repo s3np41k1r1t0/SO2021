@@ -283,16 +283,16 @@ int move(char *name, char *destination){
 	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 	//							a
 
-	inode_get(parent_inumber, &pType, &pdata);
-
-	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
-	//									v
-
 	if (parent_inumber == FAIL) {
 		printf("could not move: file/directory %s doesn't exist\n", name);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}
+
+	inode_get(parent_inumber, &pType, &pdata);
+	
+	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
+	//									v
 
 	if (child_inumber == FAIL){
 		printf("could not move: file/directory %s doesn't exist\n", name);
