@@ -288,7 +288,13 @@ int move(char *name, char *destination){
 	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
 	//									v
 
-	if ((parent_inumber == FAIL) || (child_inumber == FAIL)){
+	if (parent_inumber == FAIL) {
+		printf("could not move: file/directory %s doesn't exist\n", name);
+		undo_locks(locks,locks_size);
+		return FAIL;
+	}
+
+	if (child_inumber == FAIL){
 		printf("could not move: file/directory %s doesn't exist\n", name);
 		undo_locks(locks,locks_size);
 		return FAIL;
@@ -297,9 +303,7 @@ int move(char *name, char *destination){
 	lock_read(child_inumber);
 
 	dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
-
 	//									root
-	inode_get(dest_parent_inumber, &nType, &ndata);
 
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
@@ -307,6 +311,8 @@ int move(char *name, char *destination){
 		undo_locks(locks,locks_size);
 		return FAIL;
 	} 
+	
+	inode_get(dest_parent_inumber, &nType, &ndata);
 
 	if (lookup_sub_node(child_name, ndata.dirEntries) != FAIL){
 		printf("could not move: file/directory %s already exists\n", name);
@@ -406,9 +412,7 @@ int lookup_read_handler(char *name){
 }
 
 void undo_locks(int *locks, int size) {
-	for(int i=0; i<size; i++) {
-		unlock(locks[i]);
-	}
+	for(int i=0; i<size; i++) unlock(locks[i]);
 }
 
 /*
