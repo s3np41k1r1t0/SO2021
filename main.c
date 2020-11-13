@@ -20,9 +20,12 @@ int numberThreads = 0;
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
 int headQueue = 0;
+int indexInsert = 0, indexRemove = 0;
 
 //mutex para proteger os comandos de input
 pthread_mutex_t mutex_comandos;
+
+pthread_cond_t canInsert, canRemove;
 
 //inicializa o mutex dos comandos
 void command_mutex_init(){
@@ -56,20 +59,76 @@ void command_unlock(){
     }
 }
 
-int insertCommand(char* data) {
-    if(numberCommands != MAX_COMMANDS) {
-        strcpy(inputCommands[numberCommands++], data);
-        return 1;
+void cond_insert_init(){
+    if(pthread_cond_init(&canInsert, NULL) != 0){
+        fprintf(stderr, "Error initializing insert condition\n");
+        exit(EXIT_FAILURE);
     }
-    return 0;
+}
+
+void cond_remove_init(){
+    if(pthread_cond_init(&canRemove, NULL) != 0){
+        fprintf(stderr, "Error initializing remove condition\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void cond_insert_destroy(){
+    if(pthread_cond_destroy(&canInsert) != 0){
+        fprintf(stderr, "Error destroying insert condition\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void cond_remove_destroy(){
+    if(pthread_cond_destroy(&canRemove) != 0){
+        fprintf(stderr, "Error destroying remove condition\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void cond_init(){
+    cond_insert_init();
+    cond_remove_init();
+}
+
+void cond_destroy(){
+    cond_insert_destroy();
+    cond_remove_destroy();
+}
+
+int insertCommand(char* data) {
+    command_lock();
+    while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
+
+    if(data != NULL) strcpy(inputCommands[indexInsert%MAX_COMMANDS], data);
+    else strcpy(inputCommands[indexInsert%MAX_COMMANDS], "ACABOUPULHA");
+
+    indexInsert++;
+    numberCommands++;
+
+    pthread_cond_broadcast(&canRemove);
+    command_unlock();
+
+    return 1;
 }
 
 char* removeCommand() {
-    if(numberCommands > 0){
-        numberCommands--;
-        return inputCommands[headQueue++];  
-    }
-    return NULL;
+    char * returnValue;
+    command_lock();
+
+    while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
+
+    returnValue = inputCommands[indexRemove%MAX_COMMANDS];
+    if(!strcmp(returnValue,"ACABOUPULHA")) {command_unlock(); return NULL;}
+
+    indexRemove++;
+    numberCommands--;
+
+    pthread_cond_signal(&canInsert);
+    command_unlock();
+
+    return returnValue;
 }
 
 void errorParse(){
@@ -122,20 +181,21 @@ void processInput(FILE *input){
 
             case '#':
                 break;
-            
+
             default: { /* error */
                 errorParse();
             }
         }
     }
+
+    insertCommand(NULL);
+    pthread_cond_broadcast(&canRemove);
 }
 
 void applyCommand(){
     while (1){
         //protege a var global numberCommands e a queue de comandos
-        command_lock();
         const char* command = removeCommand();
-        command_unlock();
         
         if (command == NULL){
             return;
@@ -196,7 +256,7 @@ void applyCommand(){
 }
 
 //cria as threads e junta-as
-void applyCommands(){
+void applyCommands(FILE * inputStream){
     pthread_t tid[numberThreads];
 
     for(int i = 0; i < numberThreads; i++){    
@@ -205,6 +265,8 @@ void applyCommands(){
             exit(EXIT_FAILURE);
         }
     }
+
+    processInput(inputStream);
 
     for(int i = 0; i < numberThreads; i++){
         if(pthread_join(tid[i],NULL) != 0){
@@ -262,6 +324,7 @@ int main(int argc, char ** argv){
 
     //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
     init_fs();
+    cond_init();
     
     command_mutex_init();
     
@@ -272,19 +335,16 @@ int main(int argc, char ** argv){
     inputfile = fopen(argv[1],"r"); 
     check_file_open(inputfile, argv[1]);
     
-    //le todos os comandos a partir do inputfile e fecha-o
-    processInput(inputfile);
-    close_file(inputfile, argv[1]);
-
     //corre as operacoes do filesystem
-    applyCommands();
+    applyCommands(inputfile);
 
     //abre o outputfile, escreve o output e fecha o ficheiro
     outputfile = fopen(argv[2],"w");
     check_file_open(outputfile, argv[2]);
     print_tecnicofs_tree(outputfile);
     close_file(outputfile, argv[2]);
-    
+    close_file(inputfile, argv[1]);
+
     //destroi o filesystem e os mutex/rwlocks
     destroy_fs();
     command_mutex_destroy();
