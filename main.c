@@ -246,8 +246,8 @@ void applyCommand(){
                 delete(name);
                 break;
             case 'm':
-                printf("Move: %s\n", name);
                 move(name, destination);
+                printf("Move: %s\n", name);
                 break;
             default: { /* error */
                 fprintf(stderr, "Error: command to apply\n");

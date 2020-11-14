@@ -46,6 +46,7 @@ typedef struct inode_t {
 
 void lock_read(int i);
 void lock_write(int i);
+int try_lock_write(int i);
 void unlock(int i);
 
 void insert_delay(int cycles);

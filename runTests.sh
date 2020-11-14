@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#TODO remove this
+
 inputdir=$1
 outputdir=$2
 maxthreads=$3

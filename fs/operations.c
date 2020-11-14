@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #define WRITE 0
 #define READ  1
@@ -280,7 +281,11 @@ int move(char *name, char *destination){
 	split_parent_child_from_path(dest_name_copy, &dest_parent_name, &dest_child_name);
 	//                             z                   root                z          
 
-	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
+	while((parent_inumber = lookup(parent_name,WRITE,,&locks_size)) == -1){
+		undo_locks(locks,locks_size); 
+		locks_size = 0;
+	}
+
 	//							a
 
 	if (parent_inumber == FAIL) {
@@ -300,13 +305,25 @@ int move(char *name, char *destination){
 		return FAIL;
 	}
 
-	lock_read(child_inumber);
+	lock_write(child_inumber);
 
-	dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
+	//dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
 	//									root
-
+	
+	while((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == -1){
+		undo_locks(locks,locks_size); 
+		locks_size = 0;
+	}
+	
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
+		unlock(child_inumber);
+		undo_locks(locks,locks_size);
+		return FAIL;
+	} 
+	
+	if (dest_parent_inumber == child_inumber){
+		printf("LOOP DETECTED SKRT SKRT\n");
 		unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
@@ -346,12 +363,12 @@ int move(char *name, char *destination){
 // n time and 0 space is a not that bad algorithmical time and space complexity
 // given that the array of locks might not be sorted...
 int inLock(int inumber, int* locks, int size){
-	if(locks == NULL) return 0;
+	if(locks == NULL) return -1;
 
 	for(int i=0; i<size; i++)
-		if(locks[i] == inumber) return 0;
+		if(locks[i] == inumber) return 1;
 
-	return 1;
+	return 0;
 } 
 
 /*
@@ -360,7 +377,7 @@ int inLock(int inumber, int* locks, int size){
  *  - name: path of node
  *  - flag: enables WRITE mode
  *  - locks: array of inumbers that are locked
- *  - size: size of locks
+ *  - size: pointer to size of locks
  * Returns:
  *  inumber: identifier of the i-node, if found
  *     FAIL: otherwise
@@ -383,21 +400,37 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 	int il = inLock(current_inumber,locks,*size);
 
-	if(path == NULL && flag == WRITE) lock_write(current_inumber);
-	else if(il) lock_read(current_inumber);
+	if(!il){
+		if(path == NULL && flag == WRITE) {
+			if(try_lock_write(current_inumber) == EBUSY) 
+				return -1;
+		}
+		
+		else lock_read(current_inumber);
 
-	if(il) locks[(*size)++] = current_inumber;
-	
+		locks[(*size)++] = current_inumber;
+	}
+
 	/* get root inode data */
 	inode_get(current_inumber, &nType, &data);
 
 	/* search for all sub nodes */
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
 		path = strtok_r(NULL, delim, &saveptr);
+
 		il = inLock(current_inumber,locks,*size);
-		if(path == NULL && flag == WRITE) lock_write(current_inumber);
-		else if(il) lock_read(current_inumber);
-		if(il) locks[(*size)++] = current_inumber;
+
+		if(!il){
+			if(path == NULL && flag == WRITE) {
+				if(try_lock_write(current_inumber) == EBUSY) 
+					return -1;
+			}
+			
+			else lock_read(current_inumber);
+
+			locks[(*size)++] = current_inumber;
+		}
+
 		inode_get(current_inumber, &nType, &data);
 	}
 
@@ -412,7 +445,10 @@ int lookup_read_handler(char *name){
 }
 
 void undo_locks(int *locks, int size) {
-	for(int i=0; i<size; i++) unlock(locks[i]);
+	for(int i=0; i<size; i++) {
+		unlock(locks[i]);
+		locks[i] = 0;
+	}
 }
 
 /*

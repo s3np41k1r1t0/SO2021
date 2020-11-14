@@ -28,10 +28,10 @@ c /e/f3 d
 #
 # Deadlock entre duas tarefas
 # Estas operações devem ocorrer com sucesso
-m /a/b /c/b
-m /c/d /a/d
-m /a/b2 /c/b2
-m /c/d2 /a/d2
+#m /a/b /c/b
+#m /c/d /a/d
+#m /a/b2 /c/b2
+#m /c/d2 /a/d2
 #
 # Agora, testar que não tentamos navegar dentro de ficheiros
 #c /x f
@@ -59,6 +59,6 @@ m /c/d2 /a/d2
 #m /a/z /z
 ##
 ## Deteção de loops - /!\ estas operações devem falhar (mesmo com 1 tarefa) /!\
-#m /a /a/a
-#m /c /c/c
-#m /e /e/e
+m /a /a/a
+m /c /c/c
+m /e /e/e
