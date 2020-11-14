@@ -101,13 +101,12 @@ int insertCommand(char* data) {
     command_lock();
     while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
 
-    if(data != NULL) strcpy(inputCommands[indexInsert%MAX_COMMANDS], data);
-    else strcpy(inputCommands[indexInsert%MAX_COMMANDS], "ACABOUPULHA");
+    strcpy(inputCommands[indexInsert%MAX_COMMANDS], data);
 
     indexInsert++;
     numberCommands++;
 
-    pthread_cond_broadcast(&canRemove);
+    pthread_cond_signal(&canRemove);
     command_unlock();
 
     return 1;
@@ -120,8 +119,11 @@ char* removeCommand() {
     while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
 
     returnValue = inputCommands[indexRemove%MAX_COMMANDS];
-    if(!strcmp(returnValue,"ACABOUPULHA")) {command_unlock(); return NULL;}
 
+    //verifies if command is the stop order
+    if(!strcmp(returnValue,"x")) {command_unlock(); return NULL;}
+
+    //if stop order was given i dont want to mess around with this
     indexRemove++;
     numberCommands--;
 
@@ -188,7 +190,7 @@ void processInput(FILE *input){
         }
     }
 
-    insertCommand(NULL);
+    insertCommand("x");
     pthread_cond_broadcast(&canRemove);
 }
 
@@ -266,6 +268,7 @@ void applyCommands(FILE * inputStream){
         }
     }
 
+    //threads cant end before the input parser
     processInput(inputStream);
 
     for(int i = 0; i < numberThreads; i++){
@@ -322,7 +325,6 @@ int main(int argc, char ** argv){
 
     get_time(&start_time);    
 
-    //verifica o parametro da estrategia de sincronizacao e aplica os comandos lidos previamente
     init_fs();
     cond_init();
     
@@ -337,13 +339,13 @@ int main(int argc, char ** argv){
     
     //corre as operacoes do filesystem
     applyCommands(inputfile);
+    close_file(inputfile, argv[1]);
 
     //abre o outputfile, escreve o output e fecha o ficheiro
     outputfile = fopen(argv[2],"w");
     check_file_open(outputfile, argv[2]);
     print_tecnicofs_tree(outputfile);
     close_file(outputfile, argv[2]);
-    close_file(inputfile, argv[1]);
 
     //destroi o filesystem e os mutex/rwlocks
     destroy_fs();
