@@ -200,25 +200,7 @@ int delete(char *name){
 	type pType, cType;
 	union Data pdata, cdata;
 
-	int locks[INODE_TABLE_SIZE] = {0};eate directory: /e/f3
-Move: /a/b
-Move: /a/b2
-Move: /c/d
-Create file: /x
-Move: /c/d2
-Create file: /x/y/w/z
-failed to create a, already exists in dir 
-failed to create /x/y/w/z, invalid parent dir /x/y/w
-Move: /e/f
-Move: /a/b3
-Move: /a/b4
-Move: /c/d3
-Move: /c/d4
-Move: /e/f2
-Move: /e/f3
-Move: /a/b5
-Move: /c/d5
-Move:
+	int locks[INODE_TABLE_SIZE] = {0};
 	int locks_size = 0;
 
 	strcpy(name_copy, name);
