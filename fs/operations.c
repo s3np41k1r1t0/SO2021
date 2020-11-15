@@ -263,6 +263,10 @@ int delete(char *name){
 	return SUCCESS;
 }
 
+int isSubpath(char *src, char *dst){
+    return !strncmp(src,dst,strlen(src));
+}
+
 int move(char *name, char *destination){
 	int parent_inumber, child_inumber, dest_parent_inumber;
 	char *parent_name, *child_name, name_copy[MAX_FILE_NAME];
@@ -274,6 +278,12 @@ int move(char *name, char *destination){
 	int locks[INODE_TABLE_SIZE] = {0};
 	int locks_size = 0;
 	
+	
+	if (isSubpath(name,destination)){
+		printf("could not move: destination is a subpath of source\n");
+		return FAIL;
+	} 
+
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 	//                             a/v           a            v
@@ -281,7 +291,7 @@ int move(char *name, char *destination){
 	split_parent_child_from_path(dest_name_copy, &dest_parent_name, &dest_child_name);
 	//                             z                   root                z          
 
-	while((parent_inumber = lookup(parent_name,WRITE,,&locks_size)) == -1){
+	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -1){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
 	}
@@ -317,13 +327,6 @@ int move(char *name, char *destination){
 	
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
-		unlock(child_inumber);
-		undo_locks(locks,locks_size);
-		return FAIL;
-	} 
-	
-	if (dest_parent_inumber == child_inumber){
-		printf("LOOP DETECTED SKRT SKRT\n");
 		unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
