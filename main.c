@@ -101,9 +101,10 @@ int insertCommand(char* data) {
     command_lock();
     while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
 
-    strcpy(inputCommands[indexInsert%MAX_COMMANDS], data);
+    strcpy(inputCommands[indexInsert], data);
 
     indexInsert++;
+    indexInsert%=MAX_COMMANDS;
     numberCommands++;
 
     pthread_cond_signal(&canRemove);
@@ -118,13 +119,14 @@ char* removeCommand() {
 
     while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
 
-    returnValue = inputCommands[indexRemove%MAX_COMMANDS];
+    returnValue = inputCommands[indexRemove];
 
     //verifies if command is the stop order
     if(!strcmp(returnValue,"x")) {command_unlock(); return NULL;}
 
     //if stop order was given i dont want to mess around with this
     indexRemove++;
+    indexRemove%=MAX_COMMANDS;
     numberCommands--;
 
     pthread_cond_signal(&canInsert);

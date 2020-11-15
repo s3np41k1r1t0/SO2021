@@ -131,8 +131,11 @@ int create(char *name, type nodeType){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
-	
+	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -23){
+		undo_locks(locks,locks_size); 
+		locks_size = 0;
+	}
+
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
 		        name, parent_name);
@@ -202,7 +205,11 @@ int delete(char *name){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
+	//parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
+	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -23){
+		undo_locks(locks,locks_size); 
+		locks_size = 0;
+	}
 
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
@@ -263,10 +270,6 @@ int delete(char *name){
 	return SUCCESS;
 }
 
-int isSubpath(char *src, char *dst){
-    return !strncmp(src,dst,strlen(src));
-}
-
 int move(char *name, char *destination){
 	int parent_inumber, child_inumber, dest_parent_inumber;
 	char *parent_name, *child_name, name_copy[MAX_FILE_NAME];
@@ -279,7 +282,7 @@ int move(char *name, char *destination){
 	int locks_size = 0;
 	
 	
-	if (isSubpath(name,destination)){
+	if (!strncmp(name,destination,strlen(name))){
 		printf("could not move: destination is a subpath of source\n");
 		return FAIL;
 	} 
@@ -287,16 +290,17 @@ int move(char *name, char *destination){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 	//                             a/v           a            v
+	
 	strcpy(dest_name_copy, destination);
 	split_parent_child_from_path(dest_name_copy, &dest_parent_name, &dest_child_name);
 	//                             z                   root                z          
 
-	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
+	//parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 
-    /*while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -1){
+    	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -23){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
-	}*/
+	}
 
 	//							a
 
@@ -317,15 +321,16 @@ int move(char *name, char *destination){
 		return FAIL;
 	}
 
-	lock_write(child_inumber);
 
-	dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
+	//dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
 	//									root
 	
-	/*while((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == -1){
+	while((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == -23){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
-	}*/
+	}
+	
+	lock_write(child_inumber);
 	
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
@@ -407,9 +412,9 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 	if(!il){
 		if(path == NULL && flag == WRITE) {
-			/*if(try_lock_write(current_inumber) == EBUSY) 
-				return -1;*/
-            lock_write(current_inumber);
+			if(try_lock_write(current_inumber) == EBUSY) 
+				return -23;
+            		//lock_write(current_inumber);
 		}
 		
 		else lock_read(current_inumber);
@@ -428,9 +433,9 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 		if(!il){
 			if(path == NULL && flag == WRITE) {
-				/*if(try_lock_write(current_inumber) == EBUSY) 
-					return -1;*/
-                lock_write(current_inumber);
+				if(try_lock_write(current_inumber) == EBUSY) 
+					return -23;
+                		//lock_write(current_inumber);
 			}
 			
 			else lock_read(current_inumber);
@@ -446,14 +451,22 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 int lookup_read_handler(char *name){
 	int locks[INODE_TABLE_SIZE] = {0}, size = 0;
-	int search = lookup(name,READ,locks,&size);
+	int search;
+
+	while((search = lookup(name,READ,locks,&size)) == -23){
+		undo_locks(locks,size); 
+		size = 0;
+	}
+
 	undo_locks(locks,size);
 	return search;
 }
 
 void undo_locks(int *locks, int size) {
-	for(int i=0; i<size; i++)
+	for(int i=0; i<size; i++){
 		unlock(locks[i]);
+		locks[i] = 0;
+	}
 }
 
 /*
