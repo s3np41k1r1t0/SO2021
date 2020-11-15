@@ -6,6 +6,7 @@
 
 #define WRITE 0
 #define READ  1
+#define LOCK_BUSY -23
 
 /* Given a path, fills pointers with strings for the parent path and child
  * file name
@@ -131,7 +132,7 @@ int create(char *name, type nodeType){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -23){
+	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
 	}
@@ -199,14 +200,32 @@ int delete(char *name){
 	type pType, cType;
 	union Data pdata, cdata;
 
-	int locks[INODE_TABLE_SIZE] = {0};
+	int locks[INODE_TABLE_SIZE] = {0};eate directory: /e/f3
+Move: /a/b
+Move: /a/b2
+Move: /c/d
+Create file: /x
+Move: /c/d2
+Create file: /x/y/w/z
+failed to create a, already exists in dir 
+failed to create /x/y/w/z, invalid parent dir /x/y/w
+Move: /e/f
+Move: /a/b3
+Move: /a/b4
+Move: /c/d3
+Move: /c/d4
+Move: /e/f2
+Move: /e/f3
+Move: /a/b5
+Move: /c/d5
+Move:
 	int locks_size = 0;
 
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
 	//parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
-	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -23){
+	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
 	}
@@ -271,7 +290,7 @@ int delete(char *name){
 }
 
 int move(char *name, char *destination){
-	int parent_inumber, child_inumber, dest_parent_inumber;
+	int parent_inumber, child_inumber, dest_parent_inumber = LOCK_BUSY;
 	char *parent_name, *child_name, name_copy[MAX_FILE_NAME];
 	char *dest_parent_name, *dest_child_name, dest_name_copy[MAX_FILE_NAME];
 	/* use for copy */
@@ -289,45 +308,37 @@ int move(char *name, char *destination){
 
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
-	//                             a/v           a            v
 	
 	strcpy(dest_name_copy, destination);
 	split_parent_child_from_path(dest_name_copy, &dest_parent_name, &dest_child_name);
-	//                             z                   root                z          
-
-	//parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
-
-    	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -23){
-		undo_locks(locks,locks_size); 
-		locks_size = 0;
-	}
-
-	//							a
-
-	if (parent_inumber == FAIL) {
-		printf("could not move: file/directory %s doesn't exist\n", name);
-		undo_locks(locks,locks_size);
-		return FAIL;
-	}
-
-	inode_get(parent_inumber, &pType, &pdata);
 	
-	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
-	//									v
+	//this loop is needed in order to redo all locks if dest_parent is locked preventing 2/3way deadlocks
+	while(dest_parent_inumber == LOCK_BUSY){
+		while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
+			undo_locks(locks,locks_size); 
+			locks_size = 0;
+		}
 
-	if (child_inumber == FAIL){
-		printf("could not move: file/directory %s doesn't exist\n", name);
-		undo_locks(locks,locks_size);
-		return FAIL;
-	}
+		if (parent_inumber == FAIL) {
+			printf("could not move: file/directory %s doesn't exist\n", name);
+			undo_locks(locks,locks_size);
+			return FAIL;
+		}
 
+		inode_get(parent_inumber, &pType, &pdata);
+		
+		child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
 
-	//dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
-	//									root
-	
-	while((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == -23){
-		undo_locks(locks,locks_size); 
-		locks_size = 0;
+		if (child_inumber == FAIL){
+			printf("could not move: file/directory %s doesn't exist\n", name);
+			undo_locks(locks,locks_size);
+			return FAIL;
+		}
+
+		if((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
+			undo_locks(locks,locks_size); 
+			locks_size = 0;
+		}
 	}
 	
 	lock_write(child_inumber);
