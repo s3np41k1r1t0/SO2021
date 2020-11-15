@@ -291,10 +291,12 @@ int move(char *name, char *destination){
 	split_parent_child_from_path(dest_name_copy, &dest_parent_name, &dest_child_name);
 	//                             z                   root                z          
 
-	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -1){
+	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
+
+    /*while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == -1){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
-	}
+	}*/
 
 	//							a
 
@@ -317,13 +319,13 @@ int move(char *name, char *destination){
 
 	lock_write(child_inumber);
 
-	//dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
+	dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size);
 	//									root
 	
-	while((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == -1){
+	/*while((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == -1){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
-	}
+	}*/
 	
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
@@ -405,8 +407,9 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 	if(!il){
 		if(path == NULL && flag == WRITE) {
-			if(try_lock_write(current_inumber) == EBUSY) 
-				return -1;
+			/*if(try_lock_write(current_inumber) == EBUSY) 
+				return -1;*/
+            lock_write(current_inumber);
 		}
 		
 		else lock_read(current_inumber);
@@ -425,8 +428,9 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 		if(!il){
 			if(path == NULL && flag == WRITE) {
-				if(try_lock_write(current_inumber) == EBUSY) 
-					return -1;
+				/*if(try_lock_write(current_inumber) == EBUSY) 
+					return -1;*/
+                lock_write(current_inumber);
 			}
 			
 			else lock_read(current_inumber);
@@ -448,10 +452,8 @@ int lookup_read_handler(char *name){
 }
 
 void undo_locks(int *locks, int size) {
-	for(int i=0; i<size; i++) {
+	for(int i=0; i<size; i++)
 		unlock(locks[i]);
-		locks[i] = 0;
-	}
 }
 
 /*
