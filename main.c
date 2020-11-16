@@ -14,6 +14,7 @@
 
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
+#define EXIT_CMD "x"
 
 int numberThreads = 0;
 
@@ -45,6 +46,7 @@ void command_mutex_destroy(){
 
 //bloqueia o mutex dos comandos
 void command_lock(){
+
     if(pthread_mutex_lock(&mutex_comandos) != 0){
         fprintf(stderr,"Error locking mutex\n");
         exit(EXIT_FAILURE);
@@ -107,22 +109,26 @@ int insertCommand(char* data) {
     indexInsert%=MAX_COMMANDS;
     numberCommands++;
 
-    pthread_cond_signal(&canRemove);
+    if(!strcmp(data,EXIT_CMD)) pthread_cond_broadcast(&canRemove);
+    else pthread_cond_signal(&canRemove);
+
     command_unlock();
 
     return 1;
 }
 
-char* removeCommand() {
-    char * returnValue;
+int removeCommand(char *command) {
     command_lock();
 
     while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
 
-    returnValue = inputCommands[indexRemove];
+    strcpy(command,inputCommands[indexRemove]);
 
     //verifies if command is the stop order
-    if(!strcmp(returnValue,"x")) {command_unlock(); return NULL;}
+    if(!strcmp(command,EXIT_CMD)) {
+	    command_unlock(); 
+	    return 1;
+    }
 
     //if stop order was given i dont want to mess around with this
     indexRemove++;
@@ -132,7 +138,7 @@ char* removeCommand() {
     pthread_cond_signal(&canInsert);
     command_unlock();
 
-    return returnValue;
+    return 0;
 }
 
 void errorParse(){
@@ -191,17 +197,14 @@ void processInput(FILE *input){
             }
         }
     }
-
-    insertCommand("x");
-    pthread_cond_broadcast(&canRemove);
+    insertCommand(EXIT_CMD);
 }
 
 void applyCommand(){
     while (1){
-        //protege a var global numberCommands e a queue de comandos
-        const char* command = removeCommand();
+        char command[MAX_INPUT_SIZE];
         
-        if (command == NULL){
+        if (removeCommand(command)){
             return;
         }
 
@@ -248,8 +251,8 @@ void applyCommand(){
                 delete(name);
                 break;
             case 'm':
+                printf("Move: %s to %s\n", name, destination);
                 move(name, destination);
-                printf("Move: %s\n", name);
                 break;
             default: { /* error */
                 fprintf(stderr, "Error: command to apply\n");

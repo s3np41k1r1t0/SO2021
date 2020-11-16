@@ -4,10 +4,6 @@
 #include <string.h>
 #include <errno.h>
 
-#define WRITE 0
-#define READ  1
-#define LOCK_BUSY -23
-
 /* Given a path, fills pointers with strings for the parent path and child
  * file name
  * Input:
@@ -295,7 +291,7 @@ int move(char *name, char *destination){
 	split_parent_child_from_path(dest_name_copy, &dest_parent_name, &dest_child_name);
 	
 	//this loop is needed in order to redo all locks if dest_parent is locked preventing 2/3way deadlocks
-	while(dest_parent_inumber == LOCK_BUSY){
+	do {
 		while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
 			undo_locks(locks,locks_size); 
 			locks_size = 0;
@@ -321,13 +317,16 @@ int move(char *name, char *destination){
 			undo_locks(locks,locks_size); 
 			locks_size = 0;
 		}
-	}
+
+		//TODO is there a sleep here nanosleep();
+	} while(dest_parent_inumber == LOCK_BUSY);
 	
-	lock_write(child_inumber);
+	//TODO is this really needed?
+	//lock_write(child_inumber);
 	
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
-		unlock(child_inumber);
+		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	} 
@@ -336,7 +335,7 @@ int move(char *name, char *destination){
 
 	if (lookup_sub_node(child_name, ndata.dirEntries) != FAIL){
 		printf("could not move: file/directory %s already exists\n", name);
-		unlock(child_inumber);
+		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}
@@ -344,7 +343,7 @@ int move(char *name, char *destination){
 	if (dir_add_entry(dest_parent_inumber, child_inumber, dest_child_name) == FAIL) {
 		printf("could not move %s to dir %s\n",
 		       child_name, parent_name);
-		unlock(child_inumber);
+		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}
@@ -352,12 +351,12 @@ int move(char *name, char *destination){
 	if (dir_reset_entry(parent_inumber, child_inumber) == FAIL) {
 		printf("failed to move %s from dir %s\n",
 		       child_name, parent_name);
-		unlock(child_inumber);
+		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
-	unlock(child_inumber);
+	//unlock(child_inumber);
 	undo_locks(locks,locks_size);
 	return SUCCESS;
 }
@@ -406,7 +405,7 @@ int lookup(char *name, char flag, int *locks, int * size) {
 	if(!il){
 		if(path == NULL && flag == WRITE) {
 			if(try_lock_write(current_inumber) == EBUSY) 
-				return -23;
+				return LOCK_BUSY;
             		//lock_write(current_inumber);
 		}
 		
@@ -427,7 +426,7 @@ int lookup(char *name, char flag, int *locks, int * size) {
 		if(!il){
 			if(path == NULL && flag == WRITE) {
 				if(try_lock_write(current_inumber) == EBUSY) 
-					return -23;
+					return LOCK_BUSY;
                 		//lock_write(current_inumber);
 			}
 			
