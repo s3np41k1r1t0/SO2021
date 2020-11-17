@@ -277,6 +277,11 @@ int move(char *name, char *destination){
 
 	int locks[INODE_TABLE_SIZE] = {0};
 	int locks_size = 0;
+
+	if(!strcmp(name,destination)){
+		printf("could not move: destination is equal to source\n");
+		return FAIL;
+	} 
 	
 	//verify if the destination is not a subpath of source
 	if (!strncmp(name,destination,strlen(name))){
