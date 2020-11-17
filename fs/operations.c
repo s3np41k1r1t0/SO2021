@@ -128,6 +128,7 @@ int create(char *name, type nodeType){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
+	//repeat until the parent inumber lock is acquired
 	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
@@ -202,7 +203,7 @@ int delete(char *name){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	//parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
+	//repeat until the parent inumber lock is acquired	
 	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
 		undo_locks(locks,locks_size); 
 		locks_size = 0;
@@ -267,6 +268,13 @@ int delete(char *name){
 	return SUCCESS;
 }
 
+/*
+ * Moves a node given a source and a destination
+ * Input:
+ *  - name: path of node
+ *  - destination: path to the destination to move
+ * Returns: SUCCESS or FAIL
+ */
 int move(char *name, char *destination){
 	int parent_inumber, child_inumber, dest_parent_inumber = LOCK_BUSY;
 	char *parent_name, *child_name, name_copy[MAX_FILE_NAME];
@@ -278,7 +286,7 @@ int move(char *name, char *destination){
 	int locks[INODE_TABLE_SIZE] = {0};
 	int locks_size = 0;
 	
-	
+	//verify if the destination is not a subpath of source
 	if (!strncmp(name,destination,strlen(name))){
 		printf("could not move: destination is a subpath of source\n");
 		return FAIL;
@@ -292,11 +300,13 @@ int move(char *name, char *destination){
 	
 	//this loop is needed in order to redo all locks if dest_parent is locked preventing 2/3way deadlocks
 	do {
+		//repeat until the parent inumber lock is acquired	
 		while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
 			undo_locks(locks,locks_size); 
 			locks_size = 0;
 		}
 
+		//check if the source path exists
 		if (parent_inumber == FAIL) {
 			printf("could not move: file/directory %s doesn't exist\n", name);
 			undo_locks(locks,locks_size);
@@ -307,63 +317,69 @@ int move(char *name, char *destination){
 		
 		child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
 
+		//check if what is being moved exists
 		if (child_inumber == FAIL){
 			printf("could not move: file/directory %s doesn't exist\n", name);
 			undo_locks(locks,locks_size);
 			return FAIL;
 		}
-
+		
+		//repeat until the dest parent inumber lock is acquired	
 		if((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
 			undo_locks(locks,locks_size); 
 			locks_size = 0;
 		}
 
-		//TODO is there a sleep here nanosleep();
 	} while(dest_parent_inumber == LOCK_BUSY);
 	
-	//TODO is this really needed?
-	//lock_write(child_inumber);
-	
+	//check if the destination path exists
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
-		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	} 
 	
 	inode_get(dest_parent_inumber, &nType, &ndata);
 
+	//check if what is being moved doesn't exist already in the destination
 	if (lookup_sub_node(child_name, ndata.dirEntries) != FAIL){
 		printf("could not move: file/directory %s already exists\n", name);
-		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
+	//adds the node to the destination
 	if (dir_add_entry(dest_parent_inumber, child_inumber, dest_child_name) == FAIL) {
 		printf("could not move %s to dir %s\n",
 		       child_name, parent_name);
-		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
+	//removes the node from the source path
 	if (dir_reset_entry(parent_inumber, child_inumber) == FAIL) {
 		printf("failed to move %s from dir %s\n",
 		       child_name, parent_name);
-		//unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}
 
-	//unlock(child_inumber);
 	undo_locks(locks,locks_size);
 	return SUCCESS;
 }
 
-// searches for a inumber in a array of inumbers
-// n time and 0 space is a not that bad algorithmical time and space complexity
-// given that the array of locks might not be sorted...
+/*
+ * searches for a inumber in a array of inumbers
+ * n time and 0 space is a not that bad algorithmical time and space complexity 
+ * given that the array of locks might not be sorted...
+ * Input:
+ *  - inumber: inumber of the node to check
+ *  - locks: array of locks
+ *  - size: size of the array
+ * Returns: -1 if the array is not initialized
+ * 			1 if the inumber is in the locks array
+ * 			0 if the inumber is not in the locks array
+ */
 int inLock(int inumber, int* locks, int size){
 	if(locks == NULL) return -1;
 
@@ -402,11 +418,11 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 	int il = inLock(current_inumber,locks,*size);
 
+	//if current inumber is not locked
 	if(!il){
 		if(path == NULL && flag == WRITE) {
 			if(try_lock_write(current_inumber) == EBUSY) 
 				return LOCK_BUSY;
-            		//lock_write(current_inumber);
 		}
 		
 		else lock_read(current_inumber);
@@ -423,11 +439,11 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 		il = inLock(current_inumber,locks,*size);
 
+		//if current inumber is not locked
 		if(!il){
 			if(path == NULL && flag == WRITE) {
 				if(try_lock_write(current_inumber) == EBUSY) 
 					return LOCK_BUSY;
-                		//lock_write(current_inumber);
 			}
 			
 			else lock_read(current_inumber);
@@ -441,11 +457,19 @@ int lookup(char *name, char flag, int *locks, int * size) {
 	return current_inumber;
 }
 
+/*
+ * Does the lookup function but for the lookup command in applycommand()
+ * Input:
+ *  - name: path of node
+ * Returns:
+ *  inumber: identifier of the i-node, if found
+ */
 int lookup_read_handler(char *name){
 	int locks[INODE_TABLE_SIZE] = {0}, size = 0;
 	int search;
 
-	while((search = lookup(name,READ,locks,&size)) == -23){
+	//repeat until the search lock is acquired	
+	while((search = lookup(name,READ,locks,&size)) == LOCK_BUSY){
 		undo_locks(locks,size); 
 		size = 0;
 	}
@@ -454,6 +478,12 @@ int lookup_read_handler(char *name){
 	return search;
 }
 
+/*
+ * Unlocks all locks in a given array.
+ * Input:
+ *  - locks: array of inumbers that are locked
+ *  - size: pointer to size of locks
+ */
 void undo_locks(int *locks, int size) {
 	for(int i=0; i<size; i++){
 		unlock(locks[i]);

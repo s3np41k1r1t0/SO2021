@@ -23,12 +23,13 @@ int numberCommands = 0;
 int headQueue = 0;
 int indexInsert = 0, indexRemove = 0;
 
-//mutex para proteger os comandos de input
+//mutex to protect input commands
 pthread_mutex_t mutex_comandos;
 
+//waiting conditions to insert and remove commands from the queue
 pthread_cond_t canInsert, canRemove;
 
-//inicializa o mutex dos comandos
+//initializes command mutex
 void command_mutex_init(){
     if(pthread_mutex_init(&mutex_comandos, NULL) != 0){
         fprintf(stderr,"Error initializing mutex\n");
@@ -36,7 +37,7 @@ void command_mutex_init(){
     }
 }
 
-//destroi o mutex dos comandos
+//destroys command mutex
 void command_mutex_destroy(){
     if(pthread_mutex_destroy(&mutex_comandos) != 0){
         fprintf(stderr,"Error initializing mutex\n");
@@ -44,7 +45,7 @@ void command_mutex_destroy(){
     }
 }
 
-//bloqueia o mutex dos comandos
+//locks command mutex
 void command_lock(){
 
     if(pthread_mutex_lock(&mutex_comandos) != 0){
@@ -53,7 +54,7 @@ void command_lock(){
     }
 }
 
-//desbloqueia o mutex dos comandos
+//unlocks command mutex
 void command_unlock(){
     if(pthread_mutex_unlock(&mutex_comandos) != 0){
         fprintf(stderr,"Error unlocking mutex\n");
@@ -61,6 +62,7 @@ void command_unlock(){
     }
 }
 
+//initializes waiting condition to insert commands
 void cond_insert_init(){
     if(pthread_cond_init(&canInsert, NULL) != 0){
         fprintf(stderr, "Error initializing insert condition\n");
@@ -68,6 +70,7 @@ void cond_insert_init(){
     }
 }
 
+//initializes waiting condition to remove commands
 void cond_remove_init(){
     if(pthread_cond_init(&canRemove, NULL) != 0){
         fprintf(stderr, "Error initializing remove condition\n");
@@ -75,6 +78,7 @@ void cond_remove_init(){
     }
 }
 
+//destroys waiting condition to insert commands
 void cond_insert_destroy(){
     if(pthread_cond_destroy(&canInsert) != 0){
         fprintf(stderr, "Error destroying insert condition\n");
@@ -82,6 +86,7 @@ void cond_insert_destroy(){
     }
 }
 
+//destroys waiting condition to remove commands
 void cond_remove_destroy(){
     if(pthread_cond_destroy(&canRemove) != 0){
         fprintf(stderr, "Error destroying remove condition\n");
@@ -89,11 +94,13 @@ void cond_remove_destroy(){
     }
 }
 
+//initializes waiting conditions
 void cond_init(){
     cond_insert_init();
     cond_remove_init();
 }
 
+//destroys waiting conditions
 void cond_destroy(){
     cond_insert_destroy();
     cond_remove_destroy();
@@ -109,6 +116,7 @@ int insertCommand(char* data) {
     indexInsert%=MAX_COMMANDS;
     numberCommands++;
 
+    //if it is the exit command signal all threads to remove commands
     if(!strcmp(data,EXIT_CMD)) pthread_cond_broadcast(&canRemove);
     else pthread_cond_signal(&canRemove);
 
@@ -197,6 +205,7 @@ void processInput(FILE *input){
             }
         }
     }
+    //inserts symbolic command when there are no more commands
     insertCommand(EXIT_CMD);
 }
 
@@ -262,7 +271,7 @@ void applyCommand(){
     }
 }
 
-//cria as threads e junta-as
+//creates the threads and joins them
 void applyCommands(FILE * inputStream){
     pthread_t tid[numberThreads];
 
@@ -284,7 +293,7 @@ void applyCommands(FILE * inputStream){
     }
 }
 
-//verifica se o numero de threads eh valido
+//verifies if the number of threads is valid
 void check_numberThreads(char *numT){
     numberThreads = atoi(numT);
     if(numberThreads < 1 ){
@@ -293,7 +302,7 @@ void check_numberThreads(char *numT){
     }
 }
 
-//verifica se o ficheiro eh valido e foi aberto sem erros
+//verifies if the file is valid and opened without errors
 void check_file_open(FILE *file, char *file_name){
     if(file == NULL){
         fprintf(stderr,"Cannot open/create file: %s\n", file_name);
@@ -301,7 +310,7 @@ void check_file_open(FILE *file, char *file_name){
     }
 }
 
-//fecha o ficheiro e verifica se o fechou sem erros
+//closes the file and checks for errors
 void close_file(FILE *file, char *file_name){
     if(fclose(file) != 0){
         fprintf(stderr,"Cannot close file: %s\n", file_name);
@@ -309,7 +318,7 @@ void close_file(FILE *file, char *file_name){
     }
 }
 
-//coloca o valor do tempo atual na estrutura time
+//sets the current time
 void get_time(struct timeval *time){
     if (gettimeofday(time,NULL) != 0){
         fprintf(stderr,"Error getting the time of the day\n");
@@ -328,39 +337,51 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
+    //sets the execution start time
     get_time(&start_time);    
 
+    //initializes the filesystem
     init_fs();
+
+    //initializes waiting conditions
     cond_init();
     
+    //initializes command mutex
     command_mutex_init();
     
-    //verifica o parametro do numero de threads
+    //verifies the number of threads
     check_numberThreads(argv[3]);
 
-    //verifica se o utilizador tem permissoes para abrir o ficheiro e se ele existe
+    //verifies if the user has permissions to open the file and if it exists
     inputfile = fopen(argv[1],"r"); 
     check_file_open(inputfile, argv[1]);
     
-    //corre as operacoes do filesystem
+    //does the filesystem operations
     applyCommands(inputfile);
+
+    //closes the file
     close_file(inputfile, argv[1]);
 
-    //abre o outputfile, escreve o output e fecha o ficheiro
+    //opens the outputfile, writes the output and closes the file
     outputfile = fopen(argv[2],"w");
     check_file_open(outputfile, argv[2]);
     print_tecnicofs_tree(outputfile);
     close_file(outputfile, argv[2]);
 
-    //destroi o filesystem e os mutex/rwlocks
+    //destroys the filesystem
     destroy_fs();
+
+    //destroys command mutex
     command_mutex_destroy();
 
-    //calcula a diferenca de tempo e apresenta o benchmark
+    //calculates the difference between the execution start time and the current time
     get_time(&end_time);   
     delta = (end_time.tv_sec - start_time.tv_sec);
-    delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // microsegundos para segundos
+    delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // microseconds to seconds
+
+    //displays the benchmark result
     printf("TecnicoFS completed in %.4f seconds.\n",delta);
 
+    //ends the program successefully
     exit(EXIT_SUCCESS);
 }
