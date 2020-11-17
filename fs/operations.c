@@ -128,11 +128,7 @@ int create(char *name, type nodeType){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	//repeat until the parent inumber lock is acquired
-	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
-		undo_locks(locks,locks_size); 
-		locks_size = 0;
-	}
+	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
@@ -203,11 +199,7 @@ int delete(char *name){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	//repeat until the parent inumber lock is acquired	
-	while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
-		undo_locks(locks,locks_size); 
-		locks_size = 0;
-	}
+	parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
@@ -300,11 +292,7 @@ int move(char *name, char *destination){
 	
 	//this loop is needed in order to redo all locks if dest_parent is locked preventing 2/3way deadlocks
 	do {
-		//repeat until the parent inumber lock is acquired	
-		while((parent_inumber = lookup(parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
-			undo_locks(locks,locks_size); 
-			locks_size = 0;
-		}
+		parent_inumber = lookup(parent_name,WRITE,locks,&locks_size);
 
 		//check if the source path exists
 		if (parent_inumber == FAIL) {
@@ -312,26 +300,25 @@ int move(char *name, char *destination){
 			undo_locks(locks,locks_size);
 			return FAIL;
 		}
-
-		inode_get(parent_inumber, &pType, &pdata);
-		
-		child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
-
-		//check if what is being moved exists
-		if (child_inumber == FAIL){
-			printf("could not move: file/directory %s doesn't exist\n", name);
-			undo_locks(locks,locks_size);
-			return FAIL;
-		}
 		
 		//repeat until the dest parent inumber lock is acquired	
-		if((dest_parent_inumber = lookup(dest_parent_name,WRITE,locks,&locks_size)) == LOCK_BUSY){
+		if((dest_parent_inumber = lookup(dest_parent_name,TRY_WRITE,locks,&locks_size)) == LOCK_BUSY){
 			undo_locks(locks,locks_size); 
 			locks_size = 0;
 		}
-
 	} while(dest_parent_inumber == LOCK_BUSY);
 	
+	inode_get(parent_inumber, &pType, &pdata);
+	
+	child_inumber = lookup_sub_node(child_name, pdata.dirEntries);
+
+	//check if what is being moved exists
+	if (child_inumber == FAIL){
+		printf("could not move: file/directory %s doesn't exist\n", name);
+		undo_locks(locks,locks_size);
+		return FAIL;
+	}
+
 	//check if the destination path exists
 	if (dest_parent_inumber == FAIL){
 		printf("could not move: destination %s doesn't exist\n", dest_parent_name);
@@ -420,10 +407,13 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 	//if current inumber is not locked
 	if(!il){
-		if(path == NULL && flag == WRITE) {
+		if(path == NULL && flag == TRY_WRITE) {
 			if(try_lock_write(current_inumber) == EBUSY) 
 				return LOCK_BUSY;
 		}
+
+		else if(path == NULL && flag == WRITE)
+			lock_write(current_inumber);
 		
 		else lock_read(current_inumber);
 
@@ -441,10 +431,13 @@ int lookup(char *name, char flag, int *locks, int * size) {
 
 		//if current inumber is not locked
 		if(!il){
-			if(path == NULL && flag == WRITE) {
+			if(path == NULL && flag == TRY_WRITE) {
 				if(try_lock_write(current_inumber) == EBUSY) 
 					return LOCK_BUSY;
 			}
+
+			else if(path == NULL && flag == WRITE) 
+				lock_write(current_inumber);
 			
 			else lock_read(current_inumber);
 

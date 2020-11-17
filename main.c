@@ -337,15 +337,13 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    //sets the execution start time
-    get_time(&start_time);    
 
     //initializes the filesystem
     init_fs();
 
     //initializes waiting conditions
     cond_init();
-    
+
     //initializes command mutex
     command_mutex_init();
     
@@ -356,8 +354,16 @@ int main(int argc, char ** argv){
     inputfile = fopen(argv[1],"r"); 
     check_file_open(inputfile, argv[1]);
     
+    //sets the execution start time
+    get_time(&start_time);    
+    
     //does the filesystem operations
     applyCommands(inputfile);
+    
+    //calculates the difference between the execution start time and the current time
+    get_time(&end_time);   
+    delta = (end_time.tv_sec - start_time.tv_sec);
+    delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // microseconds to seconds
 
     //closes the file
     close_file(inputfile, argv[1]);
@@ -373,11 +379,6 @@ int main(int argc, char ** argv){
 
     //destroys command mutex
     command_mutex_destroy();
-
-    //calculates the difference between the execution start time and the current time
-    get_time(&end_time);   
-    delta = (end_time.tv_sec - start_time.tv_sec);
-    delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // microseconds to seconds
 
     //displays the benchmark result
     printf("TecnicoFS completed in %.4f seconds.\n",delta);
