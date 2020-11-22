@@ -1,4 +1,4 @@
-# SO Project 2020-21
-## Exercise 1 base code.
+# Projeto de SO
+## Agora em modelo de cliente/servidor
 
-Copyrights Bruno e Esgalha
+Copyrights: Bruno e Esgalha, with blackjack and hookers
