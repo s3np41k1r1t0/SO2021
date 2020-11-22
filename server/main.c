@@ -22,12 +22,15 @@ char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
 int headQueue = 0;
 int indexInsert = 0, indexRemove = 0;
+int waitingThreads = 0;
+int printing = 0;
 
 //mutex to protect input commands
 pthread_mutex_t mutex_comandos;
 
 //waiting conditions to insert and remove commands from the queue
 pthread_cond_t canInsert, canRemove;
+pthread_cond_t canPrint;
 
 //initializes command mutex
 void command_mutex_init(){
@@ -58,6 +61,22 @@ void command_lock(){
 void command_unlock(){
     if(pthread_mutex_unlock(&mutex_comandos) != 0){
         fprintf(stderr,"Error unlocking mutex\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//initializes waiting condition to print
+void cond_print_init(){
+    if(pthread_cond_init(&canPrint, NULL) != 0){
+        fprintf(stderr, "Error initializing insert condition\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+//destroys waiting condition to print
+void cond_print_destroy(){
+    if(pthread_cond_destroy(&canPrint) != 0){
+        fprintf(stderr, "Error destroying insert condition\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -98,12 +117,14 @@ void cond_remove_destroy(){
 void cond_init(){
     cond_insert_init();
     cond_remove_init();
+    cond_print_init();
 }
 
 //destroys waiting conditions
 void cond_destroy(){
     cond_insert_destroy();
     cond_remove_destroy();
+    cond_print_destroy();
 }
 
 int insertCommand(char* data) {
@@ -127,8 +148,9 @@ int insertCommand(char* data) {
 
 int removeCommand(char *command) {
     command_lock();
-
-    while(numberCommands == 0) pthread_cond_wait(&canRemove, &mutex_comandos);
+    waitingThreads++;
+    if(waitingThreads == numberThreads-1)pthread_cond_signal(&canPrint);
+    while(numberCommands == 0 || printing) pthread_cond_wait(&canRemove, &mutex_comandos);
 
     strcpy(command,inputCommands[indexRemove]);
 
@@ -143,6 +165,7 @@ int removeCommand(char *command) {
     indexRemove%=MAX_COMMANDS;
     numberCommands--;
 
+    waitingThreads--;
     pthread_cond_signal(&canInsert);
     command_unlock();
 
@@ -196,6 +219,13 @@ void processInput(FILE *input){
                 if(insertCommand(line))
                     break;
                 return;
+            
+            case 'p':
+                if(numTokens != 2)
+                    errorParse();
+                if(insertCommand(line))
+                    break;
+                return;
 
             case '#':
                 break;
@@ -220,12 +250,14 @@ void applyCommand(){
         char token, type;
         char name[MAX_INPUT_SIZE];
         char destination[MAX_INPUT_SIZE];
+        FILE *outputfile;
+        
         int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
 
         if (token == 'm'){
             numTokens = sscanf(command, "%c %s %s", &token, name, destination);
         }
-        
+
         if (numTokens < 2) {
             fprintf(stderr, "Error: invalid command in Queue\n");
             exit(EXIT_FAILURE);
@@ -262,6 +294,18 @@ void applyCommand(){
             case 'm':
                 printf("Move: %s to %s\n", name, destination);
                 move(name, destination);
+                break;
+            case 'p':
+                command_lock();
+                printing = 1;
+                while (waitingThreads != numberThreads-1) pthread_cond_wait(&canPrint, &mutex_comandos);
+                printf("Printing in file %s\n", name);
+                outputfile = fopen(name,"w");
+                print_tecnicofs_tree(outputfile);
+                fclose(outputfile);
+                printing = 0;
+                pthread_cond_broadcast(&canRemove);
+                command_unlock();
                 break;
             default: { /* error */
                 fprintf(stderr, "Error: command to apply\n");
