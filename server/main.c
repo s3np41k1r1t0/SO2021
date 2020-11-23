@@ -30,7 +30,7 @@ pthread_mutex_t mutex_comandos;
 
 //waiting conditions to insert and remove commands from the queue
 pthread_cond_t canInsert, canRemove;
-pthread_cond_t canPrint;
+pthread_cond_t canPrint, canWork;
 
 //initializes command mutex
 void command_mutex_init(){
@@ -148,7 +148,8 @@ int insertCommand(char* data) {
 
 int removeCommand(char *command) {
     command_lock();
-    while(numberCommands == 0 || printing) pthread_cond_wait(&canRemove, &mutex_comandos);
+    while(!numberCommands) pthread_cond_wait(&canRemove, &mutex_comandos);
+    while(printing) pthread_cond_wait(&canWork, &mutex_comandos);
 
     strcpy(command,inputCommands[indexRemove]);
 
@@ -296,14 +297,14 @@ void applyCommand(){
                 break;
             case 'p':
                 command_lock();
-                printing = 1;
-                while (removingThreads != 0) pthread_cond_wait(&canPrint, &mutex_comandos);
+                ++printing;
+                while (removingThreads) pthread_cond_wait(&canPrint, &mutex_comandos);
                 printf("Printing in file %s\n", name);
                 outputfile = fopen(name,"w");
                 print_tecnicofs_tree(outputfile);
                 fclose(outputfile);
-                printing = 0;
-                pthread_cond_broadcast(&canRemove);
+                --printing;
+                if(!printing) pthread_cond_broadcast(&canWork);
                 command_unlock();
                 continue;
             default: { /* error */
