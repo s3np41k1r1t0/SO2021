@@ -3,11 +3,13 @@
 
 #include "tecnicofs-api-constants.h"
 
-int tfsCreate(char *path, char nodeType);
+//int tfsCreate(char *path, char nodeType);
+int tfsCreate();
 int tfsDelete(char *path);
 int tfsLookup(char *path);
 int tfsMove(char *from, char *to);
-int tfsMount(char* serverName);
+int tfsMount(char *serverName);
+int tfsPrint(char *path);
 int tfsUnmount();
 
 #endif /* CLIENT_H */

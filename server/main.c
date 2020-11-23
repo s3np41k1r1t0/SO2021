@@ -11,6 +11,9 @@
 #include <sys/time.h>
 #include "fs/operations.h"
 #include <pthread.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
@@ -125,6 +128,25 @@ void cond_destroy(){
     cond_insert_destroy();
     cond_remove_destroy();
     cond_print_destroy();
+}
+
+//TODO check this functions
+
+//verifies if the file is valid and opened without errors
+int check_file_open(FILE *file, char *file_name){
+    if(file == NULL){
+        fprintf(stderr,"Cannot open/create file: %s\n", file_name);
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+//closes the file and checks for errors
+void close_file(FILE *file, char *file_name){
+    if(fclose(file) != 0){
+        fprintf(stderr,"Cannot close file: %s\n", file_name);
+        exit(EXIT_FAILURE);
+    }
 }
 
 int insertCommand(char* data) {
@@ -251,7 +273,7 @@ void applyCommand(){
         char name[MAX_INPUT_SIZE];
         char destination[MAX_INPUT_SIZE];
         FILE *outputfile;
-        
+
         int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
 
         if (token == 'm'){
@@ -301,8 +323,10 @@ void applyCommand(){
                 while (waitingThreads != numberThreads-1) pthread_cond_wait(&canPrint, &mutex_comandos);
                 printf("Printing in file %s\n", name);
                 outputfile = fopen(name,"w");
-                print_tecnicofs_tree(outputfile);
-                fclose(outputfile);
+                if(check_file_open(outputfile, name) != FAIL){
+                    print_tecnicofs_tree(outputfile);
+                    close_file(outputfile, name);
+                }
                 printing = 0;
                 pthread_cond_broadcast(&canRemove);
                 command_unlock();
@@ -346,22 +370,6 @@ void check_numberThreads(char *numT){
     }
 }
 
-//verifies if the file is valid and opened without errors
-void check_file_open(FILE *file, char *file_name){
-    if(file == NULL){
-        fprintf(stderr,"Cannot open/create file: %s\n", file_name);
-        exit(EXIT_SUCCESS);
-    }
-}
-
-//closes the file and checks for errors
-void close_file(FILE *file, char *file_name){
-    if(fclose(file) != 0){
-        fprintf(stderr,"Cannot close file: %s\n", file_name);
-        exit(EXIT_SUCCESS);        
-    }
-}
-
 //sets the current time
 void get_time(struct timeval *time){
     if (gettimeofday(time,NULL) != 0){
@@ -370,18 +378,66 @@ void get_time(struct timeval *time){
     }
 }
 
+int setSockAddrUn(char *path, struct sockaddr_un *addr) {
+
+    if (addr == NULL)
+        return 0;
+
+    bzero((char *)addr, sizeof(struct sockaddr_un));
+    addr->sun_family = AF_UNIX;
+    strcpy(addr->sun_path, path);
+
+    return SUN_LEN(addr);
+}
+
 int main(int argc, char ** argv){
     struct timeval start_time, end_time;
     double delta;
-    FILE *inputfile, *outputfile;
+    int sockfd;
+    struct sockaddr_un server_addr;
+    socklen_t addrlen;
+    char *path;
    
     //verifica o numero de argumentos
-    if(argc != 4){
-        fprintf(stderr,"Usage: ./tecnicofs <inputfile> <outputfile> numthreads\n");
+    if(argc != 3){
+        fprintf(stderr,"Usage: ./tecnicofs numthreads nomesocket\n");
         exit(EXIT_FAILURE);
     }
 
+    if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
+        perror("server: can't open socket");
+        exit(EXIT_FAILURE);
+    }
 
+    path = argv[2];
+
+    unlink(path);
+
+    addrlen = setSockAddrUn (path, &server_addr);
+
+    if (bind(sockfd, (struct sockaddr *) &server_addr, addrlen) < 0) {
+        perror("server: bind error");
+        exit(EXIT_FAILURE);
+    }
+
+    while (1) {
+        struct sockaddr_un client_addr;
+        char in_buffer[MAX_INPUT_SIZE], out_buffer[MAX_INPUT_SIZE];
+        int c;
+
+        addrlen = sizeof(struct sockaddr_un);
+        c = recvfrom(sockfd, in_buffer, sizeof(in_buffer)-1, 0,
+            (struct sockaddr *)&client_addr, &addrlen);
+        if (c <= 0) continue;
+        //Preventivo, caso o cliente nao tenha terminado a mensagem em '\0', 
+        in_buffer[c] = '\0';
+        
+        printf("Recebeu mensagem de %s\n", client_addr.sun_path);
+
+        c = sprintf(out_buffer, "Ola' %s, que tal vai isso?", in_buffer);
+        
+        sendto(sockfd, out_buffer, c+1, 0, (struct sockaddr *)&client_addr, addrlen);
+    }
     //initializes the filesystem
     init_fs();
 
@@ -392,31 +448,18 @@ int main(int argc, char ** argv){
     command_mutex_init();
     
     //verifies the number of threads
-    check_numberThreads(argv[3]);
-
-    //verifies if the user has permissions to open the file and if it exists
-    inputfile = fopen(argv[1],"r"); 
-    check_file_open(inputfile, argv[1]);
+    check_numberThreads(argv[1]);
     
     //sets the execution start time
     get_time(&start_time);    
     
     //does the filesystem operations
-    applyCommands(inputfile);
+    //applyCommands(inputfile);
     
     //calculates the difference between the execution start time and the current time
     get_time(&end_time);   
     delta = (end_time.tv_sec - start_time.tv_sec);
     delta += (end_time.tv_usec - start_time.tv_usec) / 1000000.0;   // microseconds to seconds
-
-    //closes the file
-    close_file(inputfile, argv[1]);
-
-    //opens the outputfile, writes the output and closes the file
-    outputfile = fopen(argv[2],"w");
-    check_file_open(outputfile, argv[2]);
-    print_tecnicofs_tree(outputfile);
-    close_file(outputfile, argv[2]);
 
     //destroys the filesystem
     destroy_fs();
