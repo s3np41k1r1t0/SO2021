@@ -3,8 +3,7 @@
 
 #include "tecnicofs-api-constants.h"
 
-//int tfsCreate(char *path, char nodeType);
-int tfsCreate();
+int tfsCreate(char *path, char nodeType);
 int tfsDelete(char *path);
 int tfsLookup(char *path);
 int tfsMove(char *from, char *to);

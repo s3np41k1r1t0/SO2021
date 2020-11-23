@@ -1,4 +1,5 @@
 #include "tecnicofs-client-api.h"
+#include "tecnicofs-api-constants.h"
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -6,15 +7,13 @@
 #include <sys/un.h>
 #include <stdio.h>
 
-#define SOCKET_NAME "Soquetxi"
+#define SOCKET_NAME "Soquetxi.sock"
 
-char* serverName;
 int sockfd;
 socklen_t servlen;
 struct sockaddr_un serv_addr;
 
 int setSockAddrUn(char *path, struct sockaddr_un *addr) {
-
     if (addr == NULL)
         return 0;
 
@@ -25,36 +24,106 @@ int setSockAddrUn(char *path, struct sockaddr_un *addr) {
     return SUN_LEN(addr);
 }
 
+int tfsCreate(char *filename, char nodeType) {
+    char out_buffer[MAX_INPUT_SIZE+6];
+    
+    sprintf(out_buffer,"c %s %c\n",filename,nodeType);
 
-//int tfsCreate(char *filename, char nodeType) {
-//  	return -1;
-//}
+    if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
+	perror("client: sendto error");
+	exit(EXIT_FAILURE);
+    }
+    
+    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+	perror("client: recvfrom error");
+	exit(EXIT_FAILURE);
+    }
 
-int tfsCreate() {
+    puts(out_buffer);
 
-	servlen = setSockAddrUn(serverName, &serv_addr);
-
-	if (sendto(sockfd, "Hello world", strlen("Hello world")+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
-		perror("client: sendto error");
-		exit(EXIT_FAILURE);
-  	}
-  	return -1;
+    return 0;
 }
 
 int tfsDelete(char *path) {
-  	return -1;
+    char out_buffer[MAX_INPUT_SIZE+4];
+    
+    sprintf(out_buffer,"d %s\n",path);
+
+    if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
+	perror("client: sendto error");
+	exit(EXIT_FAILURE);
+    }
+    
+    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+	perror("client: recvfrom error");
+	exit(EXIT_FAILURE);
+    }
+
+    puts(out_buffer);
+
+    return 0;
 }
 
 int tfsMove(char *from, char *to) {
-  	return -1;
+    char out_buffer[MAX_INPUT_SIZE+4];
+    
+    sprintf(out_buffer,"d %s %s\n",from,to);
+
+    if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
+	perror("client: sendto error");
+	exit(EXIT_FAILURE);
+    }
+    
+    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+	perror("client: recvfrom error");
+	exit(EXIT_FAILURE);
+    }
+
+    puts(out_buffer);
+
+    return 0;
 }
 
 int tfsLookup(char *path) {
-  	return -1;
+    char out_buffer[MAX_INPUT_SIZE+4];
+    
+    sprintf(out_buffer,"d %s\n",path);
+
+    if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
+	perror("client: sendto error");
+	exit(EXIT_FAILURE);
+    }
+    
+    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+	perror("client: recvfrom error");
+	exit(EXIT_FAILURE);
+    }
+
+    puts(out_buffer);
+    
+    return 0;
 }
 
 int tfsPrint(char *path) {
-  	return -1;
+    return -1;
+
+    char out_buffer[MAX_INPUT_SIZE+4];
+    
+    sprintf(out_buffer,"d %s\n",path);
+
+    if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
+	perror("client: sendto error");
+	exit(EXIT_FAILURE);
+    }
+    
+    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+	perror("client: recvfrom error");
+	exit(EXIT_FAILURE);
+    }
+
+    puts(out_buffer);
+    
+    return 0;
 }
 
 //TODO check errors
@@ -63,27 +132,29 @@ int tfsMount(char * sockPath) {
     socklen_t clilen;
     char *path;
 
-	serverName = sockPath;
+    path = SOCKET_NAME;
 
-	path = SOCKET_NAME;
-
-	if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
+    if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
         perror("server: can't open socket");
         return TECNICOFS_ERROR_OPEN_SESSION;
     }
 
-	unlink(path);
+    unlink(path);
 
     clilen = setSockAddrUn (path, &client_addr);
 
-	if (bind(sockfd, (struct sockaddr *) &client_addr, clilen) < 0) {
+    if (bind(sockfd, (struct sockaddr *) &client_addr, clilen) < 0) {
         perror("server: bind error");
         return TECNICOFS_ERROR_OTHER;
     }
+    
+    servlen = setSockAddrUn(sockPath, &serv_addr);
 
-  	return 0;
+    return 0;
 }
 
 int tfsUnmount() {
-  	return -1;
+    close(sockfd);
+    unlink(SOCKET_NAME);
+    return 0;
 }
