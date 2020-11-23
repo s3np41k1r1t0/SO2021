@@ -276,76 +276,76 @@ void errorParse(){
 
 void applyCommand(){
     while (1){
-	char command[MAX_INPUT_SIZE], out_buffer[300] = {0};
-	
-	if (removeCommand(command)){
-	return;
-    }
+        char command[MAX_INPUT_SIZE], out_buffer[300] = {0};
+        
+        if (removeCommand(command)){
+            return;
+        }
 
-    puts(command);
+        puts(command);
 
-    char token, type;
-    char name[MAX_INPUT_SIZE];
-    char destination[MAX_INPUT_SIZE];
-    FILE *outputfile;
-    int ret;
+        char token, type;
+        char name[MAX_INPUT_SIZE];
+        char destination[MAX_INPUT_SIZE];
+        FILE *outputfile;
+        int ret;
 
-    int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
+        int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
 
-    if (token == 'm'){
-	numTokens = sscanf(command, "%c %s %s", &token, name, destination);
-    }
+        if (token == 'm'){
+            numTokens = sscanf(command, "%c %s %s", &token, name, destination);
+        }
 
-    if (numTokens < 2) {
-	fprintf(stderr, "Error: invalid command in Queue\n");
-	exit(EXIT_FAILURE);
-    }
+        if (numTokens < 2) {
+            fprintf(stderr, "Error: invalid command in Queue\n");
+            exit(EXIT_FAILURE);
+        }
 
-    int searchResult;
-    switch (token) {
-	case 'c':
-	    switch (type) {
-	    case 'f':
-		printf("Create file: %s\n", name);
-		ret = create(name, T_FILE);
-		sprintf(out_buffer, "%d\n", ret);
-		send_client(out_buffer);
-		break;
-	    case 'd':
-		printf("Create directory: %s\n", name);
-		ret = create(name, T_DIRECTORY);
-		sprintf(out_buffer, "this is a really long buffer %d", ret);
-		send_client(out_buffer);
-		break;
-	    default:
-		    fprintf(stderr, "Error: invalid node type\n");
-		    exit(EXIT_FAILURE);
+        int searchResult;
+        switch (token) {
+            case 'c':
+                switch (type) {
+                    case 'f':
+                        printf("Create file: %s\n", name);
+                        ret = create(name, T_FILE);
+                        sprintf(out_buffer, "%d\n", ret);
+                        send_client(out_buffer);
+                        break;
+                    case 'd':
+                        printf("Create directory: %s\n", name);
+                        ret = create(name, T_DIRECTORY);
+                        sprintf(out_buffer, "this is a really long buffer %d", ret);
+                        send_client(out_buffer);
+                        break;
+                    default:
+                            fprintf(stderr, "Error: invalid node type\n");
+                            exit(EXIT_FAILURE);
                 }
-            break;
+                break;
             case 'l': 
                 searchResult = lookup_read_handler(name);
                 if (searchResult >= 0){
                     printf("Search: %s found\n", name);
-		    sprintf(out_buffer, "%d", ret);
-		    send_client(out_buffer);
-		}
+                    sprintf(out_buffer, "%d", ret);
+                    send_client(out_buffer);
+                }
                 else{
                     printf("Search: %s not found\n", name);
-		    sprintf(out_buffer, "%d", ret);
-		    send_client(out_buffer);
-		}
+                    sprintf(out_buffer, "%d", ret);
+                    send_client(out_buffer);
+                }
                 break;
             case 'd':
                 printf("Delete: %s\n", name);
                 ret = delete(name);
-		sprintf(out_buffer, "%d", ret);
-		send_client(out_buffer);
+                sprintf(out_buffer, "%d", ret);
+                send_client(out_buffer);
                 break;
             case 'm':
                 sprintf(out_buffer, "Move: %s to %s\n", name, destination);
                 ret = move(name, destination);
-		sprintf(out_buffer, "%d", ret);
-		send_client(out_buffer);
+                sprintf(out_buffer, "%d", ret);
+                send_client(out_buffer);
                 break;
             case 'p':
                 //command_lock();
@@ -357,8 +357,8 @@ void applyCommand(){
                     print_tecnicofs_tree(outputfile);
                     close_file(outputfile, name);
                 }
-		//sprintf(out_buffer, "%d", ret);
-		//send_client(out_buffer);
+                //sprintf(out_buffer, "%d", ret);
+                //send_client(out_buffer);
                 //printing = 0;
                 //pthread_cond_broadcast(&canRemove);
                 //command_unlock();
