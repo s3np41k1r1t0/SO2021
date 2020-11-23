@@ -22,7 +22,7 @@ char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
 int headQueue = 0;
 int indexInsert = 0, indexRemove = 0;
-int waitingThreads = 0;
+int removingThreads = 0;
 int printing = 0;
 
 //mutex to protect input commands
@@ -148,8 +148,6 @@ int insertCommand(char* data) {
 
 int removeCommand(char *command) {
     command_lock();
-    waitingThreads++;
-    if(waitingThreads == numberThreads-1)pthread_cond_signal(&canPrint);
     while(numberCommands == 0 || printing) pthread_cond_wait(&canRemove, &mutex_comandos);
 
     strcpy(command,inputCommands[indexRemove]);
@@ -159,13 +157,14 @@ int removeCommand(char *command) {
 	    command_unlock(); 
 	    return 1;
     }
+    
+    if(strncmp(command,"p",1)) ++removingThreads;
 
     //if stop order was given i dont want to mess around with this
     indexRemove++;
     indexRemove%=MAX_COMMANDS;
     numberCommands--;
 
-    waitingThreads--;
     pthread_cond_signal(&canInsert);
     command_unlock();
 
@@ -298,7 +297,7 @@ void applyCommand(){
             case 'p':
                 command_lock();
                 printing = 1;
-                while (waitingThreads != numberThreads-1) pthread_cond_wait(&canPrint, &mutex_comandos);
+                while (removingThreads != 0) pthread_cond_wait(&canPrint, &mutex_comandos);
                 printf("Printing in file %s\n", name);
                 outputfile = fopen(name,"w");
                 print_tecnicofs_tree(outputfile);
@@ -306,12 +305,13 @@ void applyCommand(){
                 printing = 0;
                 pthread_cond_broadcast(&canRemove);
                 command_unlock();
-                break;
+                continue;
             default: { /* error */
                 fprintf(stderr, "Error: command to apply\n");
                 exit(EXIT_FAILURE);
             }
         }
+	command_lock(); --removingThreads; if(removingThreads == 0) pthread_cond_signal(&canPrint); command_unlock();
     }
 }
 
