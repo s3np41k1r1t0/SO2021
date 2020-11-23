@@ -27,6 +27,7 @@ int setSockAddrUn(char *path, struct sockaddr_un *addr) {
 
 int tfsCreate(char *filename, char nodeType) {
     char out_buffer[MAX_INPUT_SIZE+6];
+    char in_buffer[MAX_INPUT_SIZE];
     
     sprintf(out_buffer,"c %s %c\n",filename,nodeType);
 
@@ -35,18 +36,17 @@ int tfsCreate(char *filename, char nodeType) {
 	exit(EXIT_FAILURE);
     }
     
-    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+    if(recvfrom(sockfd, in_buffer, sizeof(in_buffer), 0,0,0) < 0){
 	perror("client: recvfrom error");
 	exit(EXIT_FAILURE);
     }
 
-    puts(out_buffer);
-
-    return 0;
+    return atoi(in_buffer);
 }
 
 int tfsDelete(char *path) {
     char out_buffer[MAX_INPUT_SIZE+4];
+    char in_buffer[MAX_INPUT_SIZE];
     
     sprintf(out_buffer,"d %s\n",path);
 
@@ -55,18 +55,17 @@ int tfsDelete(char *path) {
 	exit(EXIT_FAILURE);
     }
     
-    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+    if(recvfrom(sockfd, in_buffer, sizeof(in_buffer), 0,0,0) < 0){
 	perror("client: recvfrom error");
 	exit(EXIT_FAILURE);
     }
 
-    puts(out_buffer);
-
-    return 0;
+    return atoi(in_buffer);
 }
 
 int tfsMove(char *from, char *to) {
     char out_buffer[MAX_INPUT_SIZE+4];
+    char in_buffer[MAX_INPUT_SIZE];
     
     sprintf(out_buffer,"d %s %s\n",from,to);
 
@@ -75,41 +74,39 @@ int tfsMove(char *from, char *to) {
 	exit(EXIT_FAILURE);
     }
     
-    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+    if(recvfrom(sockfd, in_buffer, sizeof(in_buffer), 0,0,0) < 0){
 	perror("client: recvfrom error");
 	exit(EXIT_FAILURE);
     }
 
-    puts(out_buffer);
-
-    return 0;
+    return atoi(in_buffer);
 }
 
 int tfsLookup(char *path) {
     char out_buffer[MAX_INPUT_SIZE+4];
-    
-    sprintf(out_buffer,"d %s\n",path);
+    char in_buffer[MAX_INPUT_SIZE];
+
+    sprintf(out_buffer,"l %s\n",path);
 
     if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
 	perror("client: sendto error");
 	exit(EXIT_FAILURE);
     }
     
-    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+    if(recvfrom(sockfd, in_buffer, sizeof(in_buffer), 0,0,0) < 0){
 	perror("client: recvfrom error");
 	exit(EXIT_FAILURE);
     }
-
-    puts(out_buffer);
     
-    return 0;
+    return atoi(in_buffer);
 }
 
 int tfsPrint(char *path) {
     return -1;
 
     char out_buffer[MAX_INPUT_SIZE+4];
-    
+    char in_buffer[MAX_INPUT_SIZE];
+
     sprintf(out_buffer,"d %s\n",path);
 
     if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
@@ -117,14 +114,12 @@ int tfsPrint(char *path) {
 	exit(EXIT_FAILURE);
     }
     
-    if(recvfrom(sockfd, out_buffer, sizeof(out_buffer), 0,0,0) < 0){
+    if(recvfrom(sockfd, in_buffer, sizeof(in_buffer), 0,0,0) < 0){
 	perror("client: recvfrom error");
 	exit(EXIT_FAILURE);
     }
-
-    puts(out_buffer);
     
-    return 0;
+    return atoi(in_buffer);
 }
 
 //TODO check errors
