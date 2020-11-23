@@ -7,7 +7,8 @@
 #include <sys/un.h>
 #include <stdio.h>
 
-#define SOCKET_NAME "Soquetxi.sock"
+#define SOCKET_NAME "Soquetxi"
+#define MAX_PATH_LEN 30
 
 int sockfd;
 socklen_t servlen;
@@ -130,9 +131,9 @@ int tfsPrint(char *path) {
 int tfsMount(char * sockPath) {
     struct sockaddr_un client_addr;
     socklen_t clilen;
-    char *path;
+    char path[MAX_PATH_LEN];
 
-    path = SOCKET_NAME;
+    sprintf(path, "/tmp/%s%d.sock", SOCKET_NAME, getpid());
 
     if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
         perror("server: can't open socket");

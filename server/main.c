@@ -282,8 +282,6 @@ void applyCommand(){
             return;
         }
 
-        puts(command);
-
         char token, type;
         char name[MAX_INPUT_SIZE];
         char destination[MAX_INPUT_SIZE];
