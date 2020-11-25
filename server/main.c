@@ -240,14 +240,14 @@ void applyCommand(){
                 command_lock();
                 ++printing;
                 while (removingThreads) pthread_cond_wait(&canPrint, &mutex);
-                printf("Printing in file %s\n", name);
-                outputfile = fopen(name,"w");
-                print_tecnicofs_tree(outputfile);
-                fclose(outputfile);
-		send_client("0");
-                --printing;
+                    printf("Printing in file %s\n", name);
+                    outputfile = fopen(name,"w");
+                    print_tecnicofs_tree(outputfile);
+                    fclose(outputfile);
+                    send_client("0");
+                    --printing;
                 if(!printing) pthread_cond_broadcast(&canWork);
-		pthread_cond_signal(&canPrint);
+                pthread_cond_signal(&canPrint);
                 command_unlock();
                 continue;
             default: { /* error */
