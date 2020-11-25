@@ -7,12 +7,11 @@
 #include <sys/un.h>
 #include <stdio.h>
 
-#define SOCKET_NAME "Soquetxi"
 #define MAX_PATH_LEN 30
 
 int sockfd;
-socklen_t servlen;
-struct sockaddr_un serv_addr;
+socklen_t servlen, clilen;
+struct sockaddr_un serv_addr, client_addr;
 
 int setSockAddrUn(char * path, struct sockaddr_un *addr) {
     if (addr == NULL)
@@ -21,7 +20,7 @@ int setSockAddrUn(char * path, struct sockaddr_un *addr) {
     bzero((char *)addr, sizeof(struct sockaddr_un));
     addr->sun_family = AF_UNIX;
     
-    if(path == NULL) mktemp(addr->sun_path);
+    if(path == NULL) sprintf(addr->sun_path,"/tmp/socket%d",getpid());
     else strcpy(addr->sun_path,path);
 
     return SUN_LEN(addr);
@@ -104,12 +103,10 @@ int tfsLookup(char *path) {
 }
 
 int tfsPrint(char *path) {
-    return -1;
-
     char out_buffer[MAX_INPUT_SIZE+4];
     char in_buffer[MAX_INPUT_SIZE];
 
-    sprintf(out_buffer,"d %s\n",path);
+    sprintf(out_buffer,"p %s\n",path);
 
     if (sendto(sockfd, out_buffer, strlen(out_buffer)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
 	perror("client: sendto error");
@@ -126,9 +123,6 @@ int tfsPrint(char *path) {
 
 //TODO check errors
 int tfsMount(char * sockPath) {
-    struct sockaddr_un client_addr;
-    socklen_t clilen;
-
     if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
         perror("server: can't open socket");
         return TECNICOFS_ERROR_OPEN_SESSION;
@@ -149,7 +143,7 @@ int tfsMount(char * sockPath) {
 int tfsUnmount() {
     if(close(sockfd) < 0) return FAIL;
 
-    unlink(SOCKET_NAME);
+    unlink(client_addr.sun_path);
     
     return SUCCESS;
 }
