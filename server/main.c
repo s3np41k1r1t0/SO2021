@@ -21,11 +21,7 @@
 
 int numberThreads = 0;
 
-char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-int numberCommands = 0;
-int headQueue = 0;
-int indexInsert = 0, indexRemove = 0;
-int waitingThreads = 0;
+int removingThreads = 0;
 int printing = 0;
 
 int sockfd;
@@ -33,15 +29,14 @@ struct sockaddr_un server_addr, client_addr;
 socklen_t addrlen;
 
 //mutex to protect input commands
-pthread_mutex_t mutex_comandos;
+pthread_mutex_t mutex;
 
 //waiting conditions to insert and remove commands from the queue
-pthread_cond_t canInsert, canRemove;
-pthread_cond_t canPrint;
+pthread_cond_t canWork, canPrint;
 
 //initializes command mutex
 void command_mutex_init(){
-    if(pthread_mutex_init(&mutex_comandos, NULL) != 0){
+    if(pthread_mutex_init(&mutex, NULL) != 0){
 	fprintf(stderr,"Error initializing mutex\n");
 	exit(EXIT_FAILURE);
     }
@@ -49,7 +44,7 @@ void command_mutex_init(){
 
 //destroys command mutex
 void command_mutex_destroy(){
-    if(pthread_mutex_destroy(&mutex_comandos) != 0){
+    if(pthread_mutex_destroy(&mutex) != 0){
 	fprintf(stderr,"Error initializing mutex\n");
 	exit(EXIT_FAILURE);
     }
@@ -57,8 +52,7 @@ void command_mutex_destroy(){
 
 //locks command mutex
 void command_lock(){
-
-    if(pthread_mutex_lock(&mutex_comandos) != 0){
+    if(pthread_mutex_lock(&mutex) != 0){
 	fprintf(stderr,"Error locking mutex\n");
 	exit(EXIT_FAILURE);
     }
@@ -66,7 +60,7 @@ void command_lock(){
 
 //unlocks command mutex
 void command_unlock(){
-    if(pthread_mutex_unlock(&mutex_comandos) != 0){
+    if(pthread_mutex_unlock(&mutex) != 0){
 	fprintf(stderr,"Error unlocking mutex\n");
 	exit(EXIT_FAILURE);
     }
@@ -88,54 +82,35 @@ void cond_print_destroy(){
     }
 }
 
-//initializes waiting condition to insert commands
-void cond_insert_init(){
-    if(pthread_cond_init(&canInsert, NULL) != 0){
-	fprintf(stderr, "Error initializing insert condition\n");
-	exit(EXIT_FAILURE);
-    }
-}
-
-//initializes waiting condition to remove commands
-void cond_remove_init(){
-    if(pthread_cond_init(&canRemove, NULL) != 0){
+//TODO add commants
+void cond_work_init(){
+    if(pthread_cond_init(&canWork, NULL) != 0){
 	fprintf(stderr, "Error initializing remove condition\n");
 	exit(EXIT_FAILURE);
     }
 }
 
-//destroys waiting condition to insert commands
-void cond_insert_destroy(){
-    if(pthread_cond_destroy(&canInsert) != 0){
-	fprintf(stderr, "Error destroying insert condition\n");
-	exit(EXIT_FAILURE);
-    }
-}
 
-//destroys waiting condition to remove commands
-void cond_remove_destroy(){
-    if(pthread_cond_destroy(&canRemove) != 0){
-	fprintf(stderr, "Error destroying remove condition\n");
+void cond_work_destroy(){
+    if(pthread_cond_destroy(&canWork) != 0){
+	fprintf(stderr, "Error destroying insert condition\n");
 	exit(EXIT_FAILURE);
     }
 }
 
 //initializes waiting conditions
 void cond_init(){
-    cond_insert_init();
-    cond_remove_init();
     cond_print_init();
+    cond_work_init();
 }
 
 //destroys waiting conditions
 void cond_destroy(){
-    cond_insert_destroy();
-    cond_remove_destroy();
     cond_print_destroy();
+    cond_work_destroy();
 }
 
 int setSockAddrUn(char *path, struct sockaddr_un *addr) {
-
     if (addr == NULL)
 	return 0;
 
@@ -164,47 +139,25 @@ void close_file(FILE *file, char *file_name){
     }
 }
 
-//int insertCommand(char* data) {
-//    command_lock();
-//    while(numberCommands == MAX_COMMANDS) pthread_cond_wait(&canInsert, &mutex_comandos);
-//
-//    strcpy(inputCommands[indexInsert], data);
-//
-//    indexInsert++;
-//    indexInsert%=MAX_COMMANDS;
-//    numberCommands++;
-//
-//    //if it is the exit command signal all threads to remove commands
-//    if(!strcmp(data,EXIT_CMD)) pthread_cond_broadcast(&canRemove);
-//    else pthread_cond_signal(&canRemove);
-//
-//    command_unlock();
-//
-//    return 1;
-//}
-
 void send_client(char *output){
     sendto(sockfd, output, strlen(output), 0, (struct sockaddr *)&client_addr, addrlen);
 }
 
 int removeCommand(char *command) {
-    //command_lock();
-    //waitingThreads++;
-    //if(waitingThreads == numberThreads-1)pthread_cond_signal(&canPrint);
-    //while(numberCommands == 0 || printing) pthread_cond_wait(&canRemove, &mutex_comandos);
-
-    //strcpy(command,inputCommands[indexRemove]);
+    command_lock();
+    while(printing) pthread_cond_wait(&canWork, &mutex);
 
     addrlen = sizeof(struct sockaddr_un);
     int c = recvfrom(sockfd, command, MAX_INPUT_SIZE-1, 0, (struct sockaddr *)&client_addr, &addrlen);
     
-    if (c <= 0) return 1;
+    if (c <= 0) return FAIL;
     
     command[c] = '\0';
-    
-    //command_unlock();
 
-    return 0;
+    if(strncmp(command,"p",1)) ++removingThreads;
+
+    command_unlock();
+    return SUCCESS;
 }
 
 void errorParse(){
@@ -212,74 +165,12 @@ void errorParse(){
     exit(EXIT_FAILURE);
 }
 
-//void processInput(FILE *input){
-//    char line[MAX_INPUT_SIZE];
-//
-//    /* break loop with ^Z or ^D */
-//    while (fgets(line, sizeof(line)/sizeof(char), input)) {
-//        char token, type;
-//        char name[MAX_INPUT_SIZE];
-//
-//        int numTokens = sscanf(line, "%c %s %c", &token, name, &type);
-//
-//        /* perform minimal validation */
-//        if (numTokens < 1) {
-//            continue;
-//        }
-//        switch (token) {
-//            case 'c':
-//                if(numTokens != 3)
-//                    errorParse();
-//                if(insertCommand(line))
-//                    break;
-//                return;
-//            
-//            case 'l':
-//                if(numTokens != 2)
-//                    errorParse();
-//                if(insertCommand(line))
-//                    break;
-//                return;
-//            
-//            case 'd':
-//                if(numTokens != 2)
-//                    errorParse();
-//                if(insertCommand(line))
-//                    break;
-//                return;
-//
-//            case 'm':
-//                if(numTokens != 3)
-//                    errorParse();
-//                if(insertCommand(line))
-//                    break;
-//                return;
-//            
-//            case 'p':
-//                if(numTokens != 2)
-//                    errorParse();
-//                if(insertCommand(line))
-//                    break;
-//                return;
-//
-//            case '#':
-//                break;
-//
-//            default: { /* error */
-//                errorParse();
-//            }
-//        }
-//    }
-//    //inserts symbolic command when there are no more commands
-//    insertCommand(EXIT_CMD);
-//}
-
 void applyCommand(){
     while (1){
         char command[MAX_INPUT_SIZE], out_buffer[300] = {0};
         
         if (removeCommand(command)){
-            return;
+            continue;
         }
 
         char token, type;
@@ -324,12 +215,12 @@ void applyCommand(){
                 searchResult = lookup_read_handler(name);
                 if (searchResult >= 0){
                     printf("Search: %s found\n", name);
-                    sprintf(out_buffer, "%d", ret);
+                    sprintf(out_buffer, "%d", searchResult);
                     send_client(out_buffer);
                 }
                 else{
                     printf("Search: %s not found\n", name);
-                    sprintf(out_buffer, "%d", ret);
+                    sprintf(out_buffer, "%d", searchResult);
                     send_client(out_buffer);
                 }
                 break;
@@ -346,34 +237,31 @@ void applyCommand(){
                 send_client(out_buffer);
                 break;
             case 'p':
-                //command_lock();
-                //printing = 1;
-                //while (waitingThreads != numberThreads-1) pthread_cond_wait(&canPrint, &mutex_comandos);
+                command_lock();
+                ++printing;
+                while (removingThreads) pthread_cond_wait(&canPrint, &mutex);
                 printf("Printing in file %s\n", name);
                 outputfile = fopen(name,"w");
-                if(check_file_open(outputfile, name) != FAIL){
-                    print_tecnicofs_tree(outputfile);
-                    close_file(outputfile, name);
-                }
-                //sprintf(out_buffer, "%d", ret);
-                //send_client(out_buffer);
-                //printing = 0;
-                //pthread_cond_broadcast(&canRemove);
-                //command_unlock();
-                break;
+                print_tecnicofs_tree(outputfile);
+                fclose(outputfile);
+		send_client("0");
+                --printing;
+                if(!printing) pthread_cond_broadcast(&canWork);
+		pthread_cond_signal(&canPrint);
+                command_unlock();
+                continue;
             default: { /* error */
                 send_client("Error: command to apply\n");
                 exit(EXIT_FAILURE);
             }
         }
+    	command_lock(); --removingThreads; if(removingThreads == 0) pthread_cond_signal(&canPrint); command_unlock();
     }
 }
 
 //creates the threads and joins them
 void applyCommands(){
-    applyCommand();
-
-    /*pthread_t tid[numberThreads];
+    pthread_t tid[numberThreads];
 
     for(int i = 0; i < numberThreads; i++){    
         if(pthread_create(&(tid[i]),NULL,(void *) &applyCommand,NULL) != 0){
@@ -390,7 +278,7 @@ void applyCommands(){
             fprintf(stderr,"Error joining thread\n");
             exit(EXIT_FAILURE);
         }
-    }*/
+    }
 }
 
 //verifies if the number of threads is valid
@@ -401,14 +289,6 @@ void check_numberThreads(char *numT){
         exit(EXIT_FAILURE);
     }
 }
-
-//sets the current time
-//void get_time(struct timeval *time){
-//    if (gettimeofday(time,NULL) != 0){
-//        fprintf(stderr,"Error getting the time of the day\n");
-//        exit(EXIT_FAILURE);
-//    }
-//}
 
 int main(int argc, char ** argv){
     char *path;

@@ -2,6 +2,9 @@
 #ifndef TECNICOFS_API_CONSTANTS_H
 #define TECNICOFS_API_CONSTANTS_H
 
+#define SUCCESS 0
+#define FAIL -1
+
 #define MAX_FILE_NAME 100
 #define MAX_INPUT_SIZE 100
 
