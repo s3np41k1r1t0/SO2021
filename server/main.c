@@ -143,6 +143,8 @@ void send_client(char *output){
     sendto(sockfd, output, strlen(output), 0, (struct sockaddr *)&client_addr, addrlen);
 }
 
+//int recv_client(){}
+
 int removeCommand(char *command) {
     command_lock();
     while(printing) pthread_cond_wait(&canWork, &mutex);
@@ -231,7 +233,7 @@ void applyCommand(){
                 send_client(out_buffer);
                 break;
             case 'm':
-                sprintf(out_buffer, "Move: %s to %s\n", name, destination);
+                printf("Move: %s to %s\n", name, destination);
                 ret = move(name, destination);
                 sprintf(out_buffer, "%d", ret);
                 send_client(out_buffer);
@@ -258,6 +260,9 @@ void applyCommand(){
     	command_lock(); --removingThreads; if(removingThreads == 0) pthread_cond_signal(&canPrint); command_unlock();
     }
 }
+
+//TODO passar o socket certo guardado algures para nao se enviar para o errado?
+//TODO fix deadlocks?
 
 //creates the threads and joins them
 void applyCommands(){
@@ -290,21 +295,12 @@ void check_numberThreads(char *numT){
     }
 }
 
-int main(int argc, char ** argv){
-    char *path;
-   
-    //verifica o numero de argumentos
-    if(argc != 3){
-        fprintf(stderr,"Usage: ./tecnicofs numthreads nomesocket\n");
-        exit(EXIT_FAILURE);
-    }
-
+//initializes the socket
+void init_socket(char *path){
     if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
         perror("server: can't open socket");
         exit(EXIT_FAILURE);
     }
-
-    path = argv[2];
 
     unlink(path);
 
@@ -314,6 +310,23 @@ int main(int argc, char ** argv){
         perror("server: bind error");
         exit(EXIT_FAILURE);
     }
+}
+
+//checks arguments
+void check_arguments(int argc){
+    if(argc != 3){
+        fprintf(stderr,"Usage: ./tecnicofs numthreads nomesocket\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+int main(int argc, char ** argv){
+   
+    //checks arguments
+    check_arguments(argc);
+
+    //initializes the socket
+    init_socket(argv[2]);
 
     //initializes the filesystem
     init_fs();
