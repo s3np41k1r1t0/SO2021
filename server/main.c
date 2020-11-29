@@ -25,10 +25,8 @@ int removingThreads = 0;
 int printing = 0;
 
 int sockfd;
-struct sockaddr_un server_addr, client_addr;
-socklen_t addrlen;
+struct sockaddr_un server_addr;
 
-//mutex to protect input commands
 pthread_mutex_t mutex;
 
 //waiting conditions to insert and remove commands from the queue
@@ -139,20 +137,20 @@ void close_file(FILE *file, char *file_name){
     }
 }
 
-void send_client(char *output){
-    sendto(sockfd, output, strlen(output), 0, (struct sockaddr *)&client_addr, addrlen);
+void send_client(char *output, struct sockaddr_un* client_addr, socklen_t addrlen){
+    sendto(sockfd, output, strlen(output), 0,(struct sockaddr *) client_addr, addrlen);
 }
 
 //int recv_client(){}
 
-int removeCommand(char *command) {
+int removeCommand(char *command, struct sockaddr_un* client_addr, socklen_t* addrlen) {
     command_lock();
     while(printing) pthread_cond_wait(&canWork, &mutex);
 
-    addrlen = sizeof(struct sockaddr_un);
-    int c = recvfrom(sockfd, command, MAX_INPUT_SIZE-1, 0, (struct sockaddr *)&client_addr, &addrlen);
+    *addrlen = sizeof(struct sockaddr_un);
+    int c = recvfrom(sockfd, command, MAX_INPUT_SIZE-1, 0,(struct sockaddr *) client_addr, addrlen);
     
-    if (c <= 0) return FAIL;
+    if (c <= 0) {command_unlock(); return FAIL;}
     
     command[c] = '\0';
 
@@ -169,15 +167,15 @@ void errorParse(){
 
 void applyCommand(){
     while (1){
-        char command[MAX_INPUT_SIZE], out_buffer[300] = {0};
+        struct sockaddr_un client_addr;
+        socklen_t addrlen;
+        char command[MAX_INPUT_SIZE], out_buffer[MAX_INPUT_SIZE] = {0};
         
-        if (removeCommand(command)){
+        if (removeCommand(command,&client_addr,&addrlen)){
             continue;
         }
 
-        char token, type;
-        char name[MAX_INPUT_SIZE];
-        char destination[MAX_INPUT_SIZE];
+        char token, type, name[MAX_INPUT_SIZE], destination[MAX_INPUT_SIZE];
         FILE *outputfile;
         int ret;
 
@@ -200,13 +198,13 @@ void applyCommand(){
                         printf("Create file: %s\n", name);
                         ret = create(name, T_FILE);
                         sprintf(out_buffer, "%d\n", ret);
-                        send_client(out_buffer);
+                        send_client(out_buffer,&client_addr,addrlen);
                         break;
                     case 'd':
                         printf("Create directory: %s\n", name);
                         ret = create(name, T_DIRECTORY);
                         sprintf(out_buffer, "this is a really long buffer %d", ret);
-                        send_client(out_buffer);
+                        send_client(out_buffer,&client_addr,addrlen);
                         break;
                     default:
                             fprintf(stderr, "Error: invalid node type\n");
@@ -218,51 +216,49 @@ void applyCommand(){
                 if (searchResult >= 0){
                     printf("Search: %s found\n", name);
                     sprintf(out_buffer, "%d", searchResult);
-                    send_client(out_buffer);
+                    send_client(out_buffer,&client_addr,addrlen);
                 }
                 else{
                     printf("Search: %s not found\n", name);
                     sprintf(out_buffer, "%d", searchResult);
-                    send_client(out_buffer);
+                    send_client(out_buffer,&client_addr,addrlen);
                 }
                 break;
             case 'd':
                 printf("Delete: %s\n", name);
                 ret = delete(name);
                 sprintf(out_buffer, "%d", ret);
-                send_client(out_buffer);
+                send_client(out_buffer,&client_addr,addrlen);
                 break;
             case 'm':
                 printf("Move: %s to %s\n", name, destination);
                 ret = move(name, destination);
                 sprintf(out_buffer, "%d", ret);
-                send_client(out_buffer);
+                send_client(out_buffer,&client_addr,addrlen);
                 break;
             case 'p':
+                //TODO fix deadlock somewhere
                 command_lock();
                 ++printing;
-                while (removingThreads) pthread_cond_wait(&canPrint, &mutex);
-                    printf("Printing in file %s\n", name);
-                    outputfile = fopen(name,"w");
-                    print_tecnicofs_tree(outputfile);
-                    fclose(outputfile);
-                    send_client("0");
-                    --printing;
+                while(removingThreads) pthread_cond_wait(&canPrint, &mutex);
+                printf("Printing in file %s\n", name);
+                outputfile = fopen(name,"w");
+                print_tecnicofs_tree(outputfile);
+                fclose(outputfile);
+                send_client("0",&client_addr,addrlen);
+                --printing;
                 if(!printing) pthread_cond_broadcast(&canWork);
-                pthread_cond_signal(&canPrint);
+                else pthread_cond_signal(&canPrint);
                 command_unlock();
                 continue;
             default: { /* error */
-                send_client("Error: command to apply\n");
+                send_client("Error: command to apply\n",&client_addr,addrlen);
                 exit(EXIT_FAILURE);
             }
         }
     	command_lock(); --removingThreads; if(removingThreads == 0) pthread_cond_signal(&canPrint); command_unlock();
     }
 }
-
-//TODO passar o socket certo guardado algures para nao se enviar para o errado?
-//TODO fix deadlocks?
 
 //creates the threads and joins them
 void applyCommands(){
@@ -304,7 +300,7 @@ void init_socket(char *path){
 
     unlink(path);
 
-    addrlen = setSockAddrUn (path, &server_addr);
+    socklen_t addrlen = setSockAddrUn (path, &server_addr);
 
     if (bind(sockfd, (struct sockaddr *) &server_addr, addrlen) < 0) {
         perror("server: bind error");

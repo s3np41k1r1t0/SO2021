@@ -160,7 +160,6 @@ int create(char *name, type nodeType){
 	if (child_inumber == FAIL) {
 		printf("failed to create %s in  %s, couldn't allocate inode\n",
 		        child_name, parent_name);
-		unlock(child_inumber);
 		undo_locks(locks,locks_size);
 		return FAIL;
 	}

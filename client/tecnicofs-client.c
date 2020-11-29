@@ -121,7 +121,7 @@ void *processInput() {
 int main(int argc, char* argv[]) {
     parseArgs(argc, argv);
 
-    if (tfsMount(serverName) == 0)
+    if (tfsMount(serverName) == SUCCESS)
         printf("Mounted! (socket = %s)\n", serverName);
     else {
         fprintf(stderr, "Unable to mount socket: %s\n", serverName);
@@ -130,7 +130,10 @@ int main(int argc, char* argv[]) {
 
     processInput();
 
-    tfsUnmount();
+    if(tfsUnmount()){ 
+        fprintf(stderr, "Unable to unmount socker: %s\n", serverName);
+        exit(EXIT_FAILURE); 
+    }   
 
     exit(EXIT_SUCCESS);
 }
