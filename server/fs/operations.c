@@ -496,3 +496,11 @@ void undo_locks(int *locks, int size) {
 void print_tecnicofs_tree(FILE *fp){
 	inode_print_tree(fp, FS_ROOT, "");
 }
+
+int print_to_file(char* filename){
+    FILE outputfile = fopen(name,"w");
+    print_tecnicofs_tree(outputfile);
+    fclose(outputfile);
+
+    return SUCCESS;
+}

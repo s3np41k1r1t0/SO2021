@@ -123,7 +123,6 @@ int tfsPrint(char *path) {
     return atoi(buffer);
 }
 
-//TODO check errors
 int tfsMount(char * sockPath) {
     if(active){
         perror("tfsMount: session is already active");

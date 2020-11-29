@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
@@ -123,8 +124,8 @@ int setSockAddrUn(char *path, struct sockaddr_un *addr) {
 //verifies if the file is valid and opened without errors
 int check_file_open(FILE *file, char *file_name){
     if(file == NULL){
-	fprintf(stderr,"Cannot open/create file: %s\n", file_name);
-	return FAIL;
+        fprintf(stderr,"Cannot open/create file: %s\n", file_name);
+        return FAIL;
     }
     return SUCCESS;
 }
@@ -132,16 +133,17 @@ int check_file_open(FILE *file, char *file_name){
 //closes the file and checks for errors
 void close_file(FILE *file, char *file_name){
     if(fclose(file) != 0){
-	fprintf(stderr,"Cannot close file: %s\n", file_name);
-	exit(EXIT_FAILURE);
+        fprintf(stderr,"Cannot close file: %s\n", file_name);
+        exit(EXIT_FAILURE);
     }
 }
 
 void send_client(char *output, struct sockaddr_un* client_addr, socklen_t addrlen){
-    sendto(sockfd, output, strlen(output), 0,(struct sockaddr *) client_addr, addrlen);
+    if(sendto(sockfd, output, strlen(output), 0,(struct sockaddr *) client_addr, addrlen) < 0){
+        fprintf(stderr,"sendto error: %d", errno);
+        exit(EXIT_FAILURE);
+    } 
 }
-
-//int recv_client(){}
 
 int removeCommand(char *command, struct sockaddr_un* client_addr, socklen_t* addrlen) {
     command_lock();
@@ -150,7 +152,10 @@ int removeCommand(char *command, struct sockaddr_un* client_addr, socklen_t* add
     *addrlen = sizeof(struct sockaddr_un);
     int c = recvfrom(sockfd, command, MAX_INPUT_SIZE-1, 0,(struct sockaddr *) client_addr, addrlen);
     
-    if (c <= 0) {command_unlock(); return FAIL;}
+    if (c <= 0) {
+        command_unlock(); 
+        return FAIL;
+    }
     
     command[c] = '\0';
 
@@ -176,7 +181,6 @@ void applyCommand(){
         }
 
         char token, type, name[MAX_INPUT_SIZE], destination[MAX_INPUT_SIZE];
-        FILE *outputfile;
         int ret;
 
         int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
@@ -197,13 +201,13 @@ void applyCommand(){
                     case 'f':
                         printf("Create file: %s\n", name);
                         ret = create(name, T_FILE);
-                        sprintf(out_buffer, "%d\n", ret);
+                        sprintf(out_buffer, "%d", ret);
                         send_client(out_buffer,&client_addr,addrlen);
                         break;
                     case 'd':
                         printf("Create directory: %s\n", name);
                         ret = create(name, T_DIRECTORY);
-                        sprintf(out_buffer, "this is a really long buffer %d", ret);
+                        sprintf(out_buffer, "%d", ret);
                         send_client(out_buffer,&client_addr,addrlen);
                         break;
                     default:
@@ -240,12 +244,12 @@ void applyCommand(){
                 //TODO fix deadlock somewhere
                 command_lock();
                 ++printing;
-                while(removingThreads) pthread_cond_wait(&canPrint, &mutex);
+                while(removingThreads || printing > 1) pthread_cond_wait(&canPrint, &mutex);
+
                 printf("Printing in file %s\n", name);
-                outputfile = fopen(name,"w");
-                print_tecnicofs_tree(outputfile);
-                fclose(outputfile);
+                print_to_file(name)
                 send_client("0",&client_addr,addrlen);
+                
                 --printing;
                 if(!printing) pthread_cond_broadcast(&canWork);
                 else pthread_cond_signal(&canPrint);
