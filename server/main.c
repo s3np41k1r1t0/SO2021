@@ -247,7 +247,7 @@ void applyCommand(){
                 while(removingThreads || printing > 1) pthread_cond_wait(&canPrint, &mutex);
 
                 printf("Printing in file %s\n", name);
-                print_to_file(name)
+                print_to_file(name);
                 send_client("0",&client_addr,addrlen);
                 
                 --printing;

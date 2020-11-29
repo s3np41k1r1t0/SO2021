@@ -498,7 +498,7 @@ void print_tecnicofs_tree(FILE *fp){
 }
 
 int print_to_file(char* filename){
-    FILE outputfile = fopen(name,"w");
+    FILE *outputfile = fopen(filename,"w");
     print_tecnicofs_tree(outputfile);
     fclose(outputfile);
 

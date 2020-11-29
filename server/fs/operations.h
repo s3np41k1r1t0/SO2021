@@ -17,5 +17,6 @@ int lookup_read_handler(char *name);
 void print_tecnicofs_tree(FILE *fp);
 int lookup(char *name, char flag, int *locks, int * size);
 void undo_locks(int *locks, int locks_size);
+int print_to_file(char* filename);
 
 #endif /* FS_H */
