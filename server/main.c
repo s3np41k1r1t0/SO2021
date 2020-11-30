@@ -160,6 +160,7 @@ int removeCommand(char *command, struct sockaddr_un* client_addr, socklen_t* add
     command[c] = '\0';
 
     if(strncmp(command,"p",1)) ++removingThreads;
+    else ++printing;
 
     command_unlock();
     return SUCCESS;
@@ -243,7 +244,6 @@ void applyCommand(){
             case 'p':
                 //TODO fix deadlock somewhere
                 command_lock();
-                ++printing;
                 while(removingThreads || printing > 1) pthread_cond_wait(&canPrint, &mutex);
 
                 printf("Printing in file %s\n", name);
