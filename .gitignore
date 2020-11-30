@@ -57,3 +57,4 @@ tecnicofs
 not.main
 outputs
 *.sock
+peda*

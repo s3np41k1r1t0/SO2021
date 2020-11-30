@@ -159,7 +159,7 @@ int removeCommand(char *command, struct sockaddr_un* client_addr, socklen_t* add
     
     command[c] = '\0';
 
-    if(strncmp(command,"p",1)) ++removingThreads;
+    if(command[0] != 'p') ++removingThreads;
     else ++printing;
 
     command_unlock();
@@ -242,17 +242,17 @@ void applyCommand(){
                 send_client(out_buffer,&client_addr,addrlen);
                 break;
             case 'p':
-                //TODO fix deadlock somewhere
                 command_lock();
                 while(removingThreads || printing > 1) pthread_cond_wait(&canPrint, &mutex);
 
-                printf("Printing in file %s\n", name);
+                printf("Printing to file %s\n", name);
                 print_to_file(name);
                 send_client("0",&client_addr,addrlen);
                 
                 --printing;
                 if(!printing) pthread_cond_broadcast(&canWork);
                 else pthread_cond_signal(&canPrint);
+
                 command_unlock();
                 continue;
             default: { /* error */
