@@ -3,7 +3,3 @@
 
 Copyrights: Bruno e Esgalha, with blackjack and hookers
 
-###TODO
-Fix deadlocks
-Funcao para client handler
-

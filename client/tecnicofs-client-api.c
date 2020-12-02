@@ -35,10 +35,8 @@ void send_server(char * command){
     }
 }
 
-void recv_server(char * command, unsigned int size){
-    memset(command,0,size);
-
-    if(recvfrom(sockfd, command, size, 0,0,0) < 0){
+void recv_server(int * ret){
+    if(recvfrom(sockfd, ret, sizeof(int), 0,0,0) < 0){
         perror("client: recvfrom error");
         exit(TECNICOFS_ERROR_CONNECTION_ERROR);
     }
@@ -46,7 +44,8 @@ void recv_server(char * command, unsigned int size){
 
 int tfsCreate(char *filename, char nodeType) {
     char buffer[MAX_INPUT_SIZE];
-    
+    int ret;
+
     if(!active){
         perror("tfsCreate: client: doesn't have an active session.");
         exit(TECNICOFS_ERROR_NO_OPEN_SESSION);
@@ -55,14 +54,15 @@ int tfsCreate(char *filename, char nodeType) {
     sprintf(buffer,"c %s %c\n",filename,nodeType);
 
     send_server(buffer);
-    recv_server(buffer,MAX_INPUT_SIZE);
-
-    return atoi(buffer);
+    recv_server(&ret);
+    
+    return ret;
 }
 
 int tfsDelete(char *path) {
     char buffer[MAX_INPUT_SIZE];
-    
+    int ret;
+
     if(!active){
         perror("tfsDelete: client: doesn't have an active session.");
         exit(TECNICOFS_ERROR_NO_OPEN_SESSION);
@@ -71,13 +71,14 @@ int tfsDelete(char *path) {
     sprintf(buffer,"d %s\n",path);
 
     send_server(buffer);
-    recv_server(buffer,MAX_INPUT_SIZE);
+    recv_server(&ret);
 
-    return atoi(buffer);
+    return ret;
 }
 
 int tfsMove(char *from, char *to) {
     char buffer[MAX_INPUT_SIZE];
+    int ret;
 
     if(!active){
         perror("tfsMove: client: doesn't have an active session.");
@@ -87,13 +88,14 @@ int tfsMove(char *from, char *to) {
     sprintf(buffer,"m %s %s\n",from,to);
 
     send_server(buffer);
-    recv_server(buffer,MAX_INPUT_SIZE);
+    recv_server(&ret);
 
-    return atoi(buffer);
+    return ret;
 }
 
 int tfsLookup(char *path) {
     char buffer[MAX_INPUT_SIZE];
+    int ret;
     
     if(!active){
         perror("tfsLookup: client: doesn't have an active session.");
@@ -103,13 +105,14 @@ int tfsLookup(char *path) {
     sprintf(buffer,"l %s\n",path);
 
     send_server(buffer);
-    recv_server(buffer,MAX_INPUT_SIZE);
+    recv_server(&ret);
     
-    return atoi(buffer);
+    return ret;
 }
 
 int tfsPrint(char *path) {
     char buffer[MAX_INPUT_SIZE];
+    int ret;
 
     if(!active){
         perror("tfsPrint: client: doesn't have an active session.");
@@ -119,9 +122,9 @@ int tfsPrint(char *path) {
     sprintf(buffer,"p %s\n",path);
 
     send_server(buffer);
-    recv_server(buffer,MAX_INPUT_SIZE);
+    recv_server(&ret);
     
-    return atoi(buffer);
+    return ret;
 }
 
 int tfsMount(char * sockPath) {

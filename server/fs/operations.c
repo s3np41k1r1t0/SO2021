@@ -498,13 +498,17 @@ void print_tecnicofs_tree(FILE *fp){
 }
 
 int print_to_file(char* filename){
+	lock_write(FS_ROOT);
+
 	FILE *outputfile = fopen(filename,"w");
 	
-	if(outputfile == NULL) return FAIL;
+	if(outputfile == NULL) {unlock(FS_ROOT); return FAIL;}
 
 	print_tecnicofs_tree(outputfile);
 
-	if(fclose(outputfile) < 0) return FAIL;
+	if(fclose(outputfile) < 0) {unlock(FS_ROOT); return FAIL;}
+
+	unlock(FS_ROOT);
 
 	return SUCCESS;
 }

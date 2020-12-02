@@ -1,6 +1,9 @@
 # Makefile, versao 1
 # Sistemas Operativos, DEI/IST/ULisboa 2020-21
-
+# Andre Martins Esgalhado - 95533
+# Bruno Miguel Da Silva Mendes - 95544
+# Grupo - 16
+:
 CC   = gcc
 LD   = gcc
 CFLAGS =-pthread -Wall -std=gnu99 -I../
