@@ -13,7 +13,8 @@ int sockfd, active = 0;
 socklen_t servlen, clilen;
 struct sockaddr_un serv_addr, client_addr;
 
-
+//if path is a nullptr this function creates a 
+//pseudo-random-enough path for the socket
 int setSockAddrUn(char * path, struct sockaddr_un *addr) {
     if (addr == NULL)
         return 0;
@@ -64,7 +65,7 @@ int tfsDelete(char *path) {
     
     if(!active){
         perror("tfsDelete: client: doesn't have an active session.");
-        return TECNICOFS_ERROR_NO_OPEN_SESSION;
+        exit(TECNICOFS_ERROR_NO_OPEN_SESSION);
     }
     
     sprintf(buffer,"d %s\n",path);
@@ -80,7 +81,7 @@ int tfsMove(char *from, char *to) {
 
     if(!active){
         perror("tfsMove: client: doesn't have an active session.");
-        return TECNICOFS_ERROR_NO_OPEN_SESSION;
+        exit(TECNICOFS_ERROR_NO_OPEN_SESSION);
     }
     
     sprintf(buffer,"m %s %s\n",from,to);
@@ -96,7 +97,7 @@ int tfsLookup(char *path) {
     
     if(!active){
         perror("tfsLookup: client: doesn't have an active session.");
-        return TECNICOFS_ERROR_NO_OPEN_SESSION;
+        exit(TECNICOFS_ERROR_NO_OPEN_SESSION);
     }
 
     sprintf(buffer,"l %s\n",path);

@@ -100,10 +100,10 @@ int lookup_sub_node(char *name, DirEntry *entries) {
 		return FAIL;
 	}
 	for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-        if (entries[i].inumber != FREE_INODE && strcmp(entries[i].name, name) == 0) {
-            return entries[i].inumber;
-        }
-    }
+		if (entries[i].inumber != FREE_INODE && strcmp(entries[i].name, name) == 0) {
+		    return entries[i].inumber;
+		}
+	}
 	return FAIL;
 }
 
@@ -498,9 +498,13 @@ void print_tecnicofs_tree(FILE *fp){
 }
 
 int print_to_file(char* filename){
-    FILE *outputfile = fopen(filename,"w");
-    print_tecnicofs_tree(outputfile);
-    fclose(outputfile);
+	FILE *outputfile = fopen(filename,"w");
+	
+	if(outputfile == NULL) return FAIL;
 
-    return SUCCESS;
+	print_tecnicofs_tree(outputfile);
+
+	if(fclose(outputfile) < 0) return FAIL;
+
+	return SUCCESS;
 }

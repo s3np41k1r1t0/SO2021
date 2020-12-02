@@ -212,8 +212,8 @@ void applyCommand(){
                         send_client(out_buffer,&client_addr,addrlen);
                         break;
                     default:
-                            fprintf(stderr, "Error: invalid node type\n");
-                            exit(EXIT_FAILURE);
+			fprintf(stderr, "Error: invalid node type\n");
+			exit(EXIT_FAILURE);
                 }
                 break;
             case 'l': 
@@ -246,8 +246,9 @@ void applyCommand(){
                 while(removingThreads || printing > 1) pthread_cond_wait(&canPrint, &mutex);
 
                 printf("Printing to file %s\n", name);
-                print_to_file(name);
-                send_client("0",&client_addr,addrlen);
+                ret = print_to_file(name);
+		sprintf(out_buffer, "%d", ret);
+                send_client(out_buffer,&client_addr,addrlen);
                 
                 --printing;
                 if(!printing) pthread_cond_broadcast(&canWork);
