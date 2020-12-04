@@ -491,24 +491,18 @@ void undo_locks(int *locks, int size) {
 /*
  * Prints tecnicofs tree.
  * Input:
- *  - fp: pointer to output file
+ *  - filename: name of the output file
  */
-void print_tecnicofs_tree(FILE *fp){
-	inode_print_tree(fp, FS_ROOT, "");
-}
-
-int print_to_file(char* filename){
-	lock_write(FS_ROOT);
-
+int print_tecnicofs_tree(char* filename){
 	FILE *outputfile = fopen(filename,"w");
 	
-	if(outputfile == NULL) {unlock(FS_ROOT); return FAIL;}
+	if(outputfile == NULL) return FAIL;
 
-	print_tecnicofs_tree(outputfile);
-
-	if(fclose(outputfile) < 0) {unlock(FS_ROOT); return FAIL;}
-
+	lock_write(FS_ROOT);
+	inode_print_tree(outputfile, FS_ROOT, "");
 	unlock(FS_ROOT);
+
+	if(fclose(outputfile) < 0) return FAIL;
 
 	return SUCCESS;
 }

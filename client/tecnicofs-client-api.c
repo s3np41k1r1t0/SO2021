@@ -7,8 +7,6 @@
 #include <sys/un.h>
 #include <stdio.h>
 
-#define MAX_PATH_LEN 30
-
 int sockfd, active = 0;
 socklen_t servlen, clilen;
 struct sockaddr_un serv_addr, client_addr;
@@ -28,6 +26,7 @@ int setSockAddrUn(char * path, struct sockaddr_un *addr) {
     return SUN_LEN(addr);
 }
 
+//sends command to the server 
 void send_server(char * command){ 
     if (sendto(sockfd, command, strlen(command)+1, 0, (struct sockaddr *) &serv_addr, servlen) < 0) {
         perror("client: sendto error");
@@ -35,6 +34,8 @@ void send_server(char * command){
     }
 }
 
+//receives command result from the server and writes it in 
+//the integer pointed by ret
 void recv_server(int * ret){
     if(recvfrom(sockfd, ret, sizeof(int), 0,0,0) < 0){
         perror("client: recvfrom error");
@@ -42,6 +43,7 @@ void recv_server(int * ret){
     }
 }
 
+//creates a node in the server's filesystem
 int tfsCreate(char *filename, char nodeType) {
     char buffer[MAX_INPUT_SIZE];
     int ret;
@@ -59,6 +61,7 @@ int tfsCreate(char *filename, char nodeType) {
     return ret;
 }
 
+//deletes a node in the server's filesystem
 int tfsDelete(char *path) {
     char buffer[MAX_INPUT_SIZE];
     int ret;
@@ -76,6 +79,7 @@ int tfsDelete(char *path) {
     return ret;
 }
 
+//moves a node in the server's filesystem
 int tfsMove(char *from, char *to) {
     char buffer[MAX_INPUT_SIZE];
     int ret;
@@ -93,6 +97,7 @@ int tfsMove(char *from, char *to) {
     return ret;
 }
 
+//looks for a node in the server's filesystem
 int tfsLookup(char *path) {
     char buffer[MAX_INPUT_SIZE];
     int ret;
@@ -110,6 +115,7 @@ int tfsLookup(char *path) {
     return ret;
 }
 
+//prints the filesystem tree to a given path (server side)
 int tfsPrint(char *path) {
     char buffer[MAX_INPUT_SIZE];
     int ret;
@@ -127,6 +133,7 @@ int tfsPrint(char *path) {
     return ret;
 }
 
+//sets up the socket and the client and server addresses 
 int tfsMount(char * sockPath) {
     if(active){
         perror("tfsMount: session is already active");
@@ -157,6 +164,7 @@ int tfsMount(char * sockPath) {
     return SUCCESS;
 }
 
+//destroys socket 
 int tfsUnmount() {
     if(!active){
         perror("tfsUnmount: doesn't have an active session");

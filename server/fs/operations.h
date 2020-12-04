@@ -14,9 +14,8 @@ int create(char *name, type nodeType);
 int delete(char *name);
 int move(char *name, char *destination);
 int lookup_read_handler(char *name);
-void print_tecnicofs_tree(FILE *fp);
+int print_tecnicofs_tree(char *filename);
 int lookup(char *name, char flag, int *locks, int * size);
 void undo_locks(int *locks, int locks_size);
-int print_to_file(char* filename);
 
 #endif /* FS_H */

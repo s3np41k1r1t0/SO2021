@@ -15,14 +15,12 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 
 #define MAX_COMMANDS 150000
 #define MAX_INPUT_SIZE 100
 
 int numberThreads = 0;
-
-int removingThreads = 0;
-int printing = 0;
 
 int sockfd;
 struct sockaddr_un server_addr;
@@ -38,6 +36,7 @@ int setSockAddrUn(char *path, struct sockaddr_un *addr) {
     return SUN_LEN(addr);
 }
 
+//checks if a file was successefully opened
 int check_file_open(FILE *file, char *file_name){
     if(file == NULL){
         fprintf(stderr,"Cannot open/create file: %s\n", file_name);
@@ -54,7 +53,7 @@ void close_file(FILE *file, char *file_name){
     }
 }
 
-//TODO change to int
+//sends result to specified client
 void send_client(int * output, struct sockaddr_un* client_addr, socklen_t addrlen){
     if(sendto(sockfd, output, sizeof(int), 0,(struct sockaddr *) client_addr, addrlen) < 0){
         fprintf(stderr,"sendto error: %d", errno);
@@ -62,6 +61,7 @@ void send_client(int * output, struct sockaddr_un* client_addr, socklen_t addrle
     } 
 }
 
+//receives command from a client and stores it in the command pointer
 int removeCommand(char *command, struct sockaddr_un* client_addr, socklen_t* addrlen) {
     *addrlen = sizeof(struct sockaddr_un);
     int c = recvfrom(sockfd, command, MAX_INPUT_SIZE-1, 0,(struct sockaddr *) client_addr, addrlen);
@@ -141,7 +141,7 @@ void applyCommand(){
                 break;
             case 'p':
 		printf("Printing to file %s\n", name);
-                ret = print_to_file(name);
+                ret = print_tecnicofs_tree(name);
                 send_client(&ret,&client_addr,addrlen);
                 continue;
             default: { /* error */
@@ -189,6 +189,8 @@ void init_socket(char *path){
         exit(EXIT_FAILURE);
     }
 
+    //error is not verified on purpouse
+    //file may not exist
     unlink(path);
 
     socklen_t addrlen = setSockAddrUn (path, &server_addr);
@@ -207,8 +209,28 @@ void check_arguments(int argc){
     }
 }
 
+//destroys the server after a SIGINT
+void destroy_socket(int signum){
+    destroy_fs();
+
+    if(close(sockfd) < 0){
+	perror("Cannot close socket fd");
+	exit(EXIT_FAILURE);
+    }
+    
+    if(unlink(server_addr.sun_path) < 0){
+	perror("Cannot unlink socket path");
+	exit(EXIT_FAILURE);
+    }
+
+    puts("\nGraceful Shutdown successeful");
+    exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char ** argv){
-   
+    //use ctrl-c to gracefully shutdown the server
+    signal(SIGINT,destroy_socket);
+
     //checks arguments
     check_arguments(argc);
 
